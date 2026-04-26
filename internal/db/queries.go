@@ -12,6 +12,18 @@ import (
 
 var ErrTableMissing = errors.New("table missing")
 
+func ClampLimit(limit int) int {
+	if limit <= 0 {
+		return 25
+	}
+
+	if limit > 200 {
+		return 200
+	}
+
+	return limit
+}
+
 func CountRows(conn *sql.DB, table string) (int, error) {
 	if !valid_table_name(table) {
 		return 0, fmt.Errorf("invalid table name: %s", table)
@@ -32,6 +44,14 @@ func CountRows(conn *sql.DB, table string) (int, error) {
 	}
 
 	return count, nil
+}
+
+func EscapeLikeQuery(query string) string {
+	query = strings.ReplaceAll(query, `\`, `\\`)
+	query = strings.ReplaceAll(query, `%`, `\%`)
+	query = strings.ReplaceAll(query, `_`, `\_`)
+
+	return query
 }
 
 func DayByGregorianDate(conn *sql.DB, value string) (CalendarDay, bool, error) {
@@ -286,6 +306,185 @@ func SaintsViewByGregorianDate(conn *sql.DB, value string) (SaintsView, bool, er
 	}, true, nil
 }
 
+func SearchHymns(conn *sql.DB, query string, limit int) ([]SearchResultHymn, error) {
+	exists, err := table_exists(conn, "hymns")
+	if err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		return []SearchResultHymn{}, nil
+	}
+
+	likeQuery := "%" + EscapeLikeQuery(query) + "%"
+	rows, err := conn.Query(`
+		SELECT
+			calendar_days.gregorian_date,
+			calendar_days.julian_date,
+			hymns.section_order,
+			hymns.hymn_order,
+			hymns.hymn_type,
+			hymns.tone,
+			hymns.title,
+			substr(hymns.text, 1, 160)
+		FROM hymns
+		JOIN calendar_days ON calendar_days.id = hymns.day_id
+		WHERE hymns.title LIKE ? ESCAPE '\'
+			OR hymns.hymn_type LIKE ? ESCAPE '\'
+			OR hymns.tone LIKE ? ESCAPE '\'
+			OR hymns.text LIKE ? ESCAPE '\'
+		ORDER BY calendar_days.gregorian_date, hymns.section_order, hymns.hymn_order
+		LIMIT ?
+	`, likeQuery, likeQuery, likeQuery, likeQuery, ClampLimit(limit))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := []SearchResultHymn{}
+	for rows.Next() {
+		item := SearchResultHymn{}
+		if err := rows.Scan(
+			&item.GregorianDate,
+			&item.JulianDate,
+			&item.SectionOrder,
+			&item.HymnOrder,
+			&item.HymnType,
+			&item.Tone,
+			&item.Title,
+			&item.TextPreview,
+		); err != nil {
+			return nil, err
+		}
+
+		results = append(results, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
+func SearchReadings(conn *sql.DB, query string, limit int) ([]SearchResultReading, error) {
+	exists, err := table_exists(conn, "scripture_readings")
+	if err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		return []SearchResultReading{}, nil
+	}
+
+	likeQuery := "%" + EscapeLikeQuery(query) + "%"
+	rows, err := conn.Query(`
+		SELECT
+			calendar_days.gregorian_date,
+			calendar_days.julian_date,
+			scripture_readings.reading_order,
+			scripture_readings.verse_reference,
+			scripture_readings.description
+		FROM scripture_readings
+		JOIN calendar_days ON calendar_days.id = scripture_readings.day_id
+		WHERE scripture_readings.verse_reference LIKE ? ESCAPE '\'
+			OR scripture_readings.description LIKE ? ESCAPE '\'
+			OR scripture_readings.display_text LIKE ? ESCAPE '\'
+		ORDER BY calendar_days.gregorian_date, scripture_readings.reading_order
+		LIMIT ?
+	`, likeQuery, likeQuery, likeQuery, ClampLimit(limit))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := []SearchResultReading{}
+	for rows.Next() {
+		item := SearchResultReading{}
+		if err := rows.Scan(
+			&item.GregorianDate,
+			&item.JulianDate,
+			&item.ReadingOrder,
+			&item.VerseReference,
+			&item.Description,
+		); err != nil {
+			return nil, err
+		}
+
+		results = append(results, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
+func SearchSaints(conn *sql.DB, query string, westernOnly bool, primaryOnly bool, limit int) ([]SearchResultSaint, error) {
+	exists, err := table_exists(conn, "saints")
+	if err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		return []SearchResultSaint{}, nil
+	}
+
+	likeQuery := "%" + EscapeLikeQuery(query) + "%"
+	rows, err := conn.Query(`
+		SELECT
+			calendar_days.gregorian_date,
+			calendar_days.julian_date,
+			saints.saint_order,
+			saints.name,
+			saints.service_rank_code,
+			saints.service_rank_name,
+			saints.is_primary,
+			saints.is_western
+		FROM saints
+		JOIN calendar_days ON calendar_days.id = saints.day_id
+		WHERE saints.name LIKE ? ESCAPE '\'
+			AND (? = 0 OR saints.is_western = 1)
+			AND (? = 0 OR saints.is_primary = 1)
+		ORDER BY calendar_days.gregorian_date, saints.saint_order
+		LIMIT ?
+	`, likeQuery, bool_int(westernOnly), bool_int(primaryOnly), ClampLimit(limit))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := []SearchResultSaint{}
+	for rows.Next() {
+		item := SearchResultSaint{}
+		isPrimary := 0
+		isWestern := 0
+		if err := rows.Scan(
+			&item.GregorianDate,
+			&item.JulianDate,
+			&item.SaintOrder,
+			&item.Name,
+			&item.ServiceRankCode,
+			&item.ServiceRankName,
+			&isPrimary,
+			&isWestern,
+		); err != nil {
+			return nil, err
+		}
+
+		item.IsPrimary = isPrimary == 1
+		item.IsWestern = isWestern == 1
+		results = append(results, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
 func ScriptureByDayID(conn *sql.DB, dayID int) ([]ScriptureReading, error) {
 	exists, err := table_exists(conn, "scripture_readings")
 	if err != nil {
@@ -333,6 +532,14 @@ func ScriptureByDayID(conn *sql.DB, dayID int) ([]ScriptureReading, error) {
 	}
 
 	return readings, nil
+}
+
+func bool_int(value bool) int {
+	if value {
+		return 1
+	}
+
+	return 0
 }
 
 func table_exists(conn *sql.DB, table string) (bool, error) {

@@ -4,9 +4,11 @@
 package app
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,13 +28,16 @@ Commands:
   readings YYYY-MM-DD
                      Show scripture readings for a Gregorian date
   hymns YYYY-MM-DD   Show hymns for a Gregorian date
+  search CATEGORY QUERY
+                     Search saints, western, primary, readings, or hymns
   info               Show database metadata and counts
   update SOURCE      Replace the configured database
 
 Options:
   --db PATH          Use a specific SQLite database
   --plain            Disable terminal styling
-  --json             Print JSON for today, tomorrow, and date
+  --json             Print JSON for supported commands
+  --limit N          Limit search results, default 25, max 200
   --help             Print help text
 `
 
@@ -40,6 +45,7 @@ type options struct {
 	dbPath string
 	help   bool
 	json   bool
+	limit  int
 	plain  bool
 }
 
@@ -85,6 +91,9 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	case "saints":
 		return run_saints(opts, commandArgs, stdout, stderr)
 
+	case "search":
+		return run_search(opts, commandArgs, stdout, stderr)
+
 	case "update":
 		return run_update(opts, commandArgs, stdout, stderr)
 
@@ -98,7 +107,9 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 }
 
 func parse_options(args []string) (options, []string, error) {
-	opts := options{}
+	opts := options{
+		limit: 25,
+	}
 	rest := []string{}
 
 	for index := 0; index < len(args); index++ {
@@ -124,6 +135,28 @@ func parse_options(args []string) (options, []string, error) {
 
 		case arg == "--json":
 			opts.json = true
+
+		case arg == "--limit":
+			if index+1 >= len(args) {
+				return options{}, nil, errors.New("error: --limit requires N")
+			}
+
+			index++
+			limit, err := strconv.Atoi(args[index])
+			if err != nil {
+				return options{}, nil, errors.New("error: --limit must be a number")
+			}
+
+			opts.limit = db.ClampLimit(limit)
+
+		case strings.HasPrefix(arg, "--limit="):
+			value := strings.TrimPrefix(arg, "--limit=")
+			limit, err := strconv.Atoi(value)
+			if err != nil {
+				return options{}, nil, errors.New("error: --limit must be a number")
+			}
+
+			opts.limit = db.ClampLimit(limit)
 
 		case arg == "--help":
 			opts.help = true
@@ -357,6 +390,134 @@ func print_info(stdout io.Writer, view db.InfoView) {
 	fmt.Fprintf(stdout, "saints: %d\n", view.Counts.Saints)
 	fmt.Fprintf(stdout, "scripture_readings: %d\n", view.Counts.ScriptureReadings)
 	fmt.Fprintf(stdout, "hymns: %d\n", view.Counts.Hymns)
+}
+
+func run_search(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) < 2 {
+		fmt.Fprintln(stderr, "error: search requires CATEGORY and QUERY")
+		return 2
+	}
+
+	category := args[0]
+	query := strings.TrimSpace(strings.Join(args[1:], " "))
+	if query == "" {
+		fmt.Fprintln(stderr, "error: search query cannot be empty")
+		return 2
+	}
+
+	dbPath, err := config.ResolveDBPath(opts.dbPath)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	conn, err := db.Open(dbPath)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	defer conn.Close()
+
+	switch category {
+	case "saints":
+		return run_search_saints(conn, opts, query, "saints", false, false, stdout, stderr)
+
+	case "western":
+		return run_search_saints(conn, opts, query, "western", true, false, stdout, stderr)
+
+	case "primary":
+		return run_search_saints(conn, opts, query, "primary", false, true, stdout, stderr)
+
+	case "readings":
+		return run_search_readings(conn, opts, query, stdout, stderr)
+
+	case "hymns":
+		return run_search_hymns(conn, opts, query, stdout, stderr)
+	}
+
+	fmt.Fprintf(stderr, "error: unknown search category %q\n", category)
+	return 2
+}
+
+func run_search_hymns(conn *sql.DB, opts options, query string, stdout io.Writer, stderr io.Writer) int {
+	results, err := db.SearchHymns(conn, query, opts.limit)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	view := db.SearchHymnsView{
+		Query:    query,
+		Category: "hymns",
+		Limit:    db.ClampLimit(opts.limit),
+		Results:  results,
+	}
+
+	if opts.json {
+		if err := render.RenderSearchHymnsJSON(view); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+
+		return 0
+	}
+
+	render.SearchHymns(stdout, view)
+	return 0
+}
+
+func run_search_readings(conn *sql.DB, opts options, query string, stdout io.Writer, stderr io.Writer) int {
+	results, err := db.SearchReadings(conn, query, opts.limit)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	view := db.SearchReadingsView{
+		Query:    query,
+		Category: "readings",
+		Limit:    db.ClampLimit(opts.limit),
+		Results:  results,
+	}
+
+	if opts.json {
+		if err := render.RenderSearchReadingsJSON(view); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+
+		return 0
+	}
+
+	render.SearchReadings(stdout, view)
+	return 0
+}
+
+func run_search_saints(conn *sql.DB, opts options, query string, category string, westernOnly bool, primaryOnly bool, stdout io.Writer, stderr io.Writer) int {
+	results, err := db.SearchSaints(conn, query, westernOnly, primaryOnly, opts.limit)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	view := db.SearchSaintsView{
+		Query:    query,
+		Category: category,
+		Limit:    db.ClampLimit(opts.limit),
+		Results:  results,
+	}
+
+	if opts.json {
+		if err := render.RenderSearchSaintsJSON(view); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+
+		return 0
+	}
+
+	render.SearchSaints(stdout, view)
+	return 0
 }
 
 func run_readings(opts options, args []string, stdout io.Writer, stderr io.Writer) int {

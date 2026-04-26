@@ -25,16 +25,17 @@ go build ./cmd/orthocal
 orthocal [--db PATH] [--plain] [--json] COMMAND [ARGS]
 ```
 
-| Command               | Description                         |
-| --------------------- | ----------------------------------- |
-| `today`               | Show the local system date          |
-| `tomorrow`            | Show the local system date plus one |
-| `date YYYY-MM-DD`     | Show a specific Gregorian date      |
-| `saints YYYY-MM-DD`   | Show saints for a Gregorian date    |
-| `readings YYYY-MM-DD` | Show readings for a Gregorian date  |
-| `hymns YYYY-MM-DD`    | Show hymns for a Gregorian date     |
-| `info`                | Show database metadata and counts   |
-| `update SOURCE`       | Replace the configured database     |
+| Command                 | Description                         |
+| ----------------------- | ----------------------------------- |
+| `today`                 | Show the local system date          |
+| `tomorrow`              | Show the local system date plus one |
+| `date YYYY-MM-DD`       | Show a specific Gregorian date      |
+| `saints YYYY-MM-DD`     | Show saints for a Gregorian date    |
+| `readings YYYY-MM-DD`   | Show readings for a Gregorian date  |
+| `hymns YYYY-MM-DD`      | Show hymns for a Gregorian date     |
+| `search CATEGORY QUERY` | Search calendar data                |
+| `info`                  | Show database metadata and counts   |
+| `update SOURCE`         | Replace the configured database     |
 
 Show database information:
 ```sh
@@ -52,12 +53,23 @@ orthocal readings 2026-04-12 --db ./orthodox-calendar.db
 orthocal hymns 2026-04-12 --db ./orthodox-calendar.db
 ```
 
+Search calendar data:
+```sh
+orthocal search saints John --db ./orthodox-calendar.db
+orthocal search western Osburga --db ./orthodox-calendar.db
+orthocal search primary Climacus --db ./orthodox-calendar.db
+orthocal search readings "John 20" --db ./orthodox-calendar.db
+orthocal search hymns resurrection --db ./orthodox-calendar.db
+orthocal search saints John --limit 50 --db ./orthodox-calendar.db
+```
+
 Print JSON:
 ```sh
 orthocal date 2026-04-12 --db ./orthodox-calendar.db --json
 orthocal saints 2026-04-12 --db ./orthodox-calendar.db --json
 orthocal readings 2026-04-12 --db ./orthodox-calendar.db --json
 orthocal hymns 2026-04-12 --db ./orthodox-calendar.db --json
+orthocal search saints John --db ./orthodox-calendar.db --json
 orthocal info --db ./orthodox-calendar.db --json
 ```
 
@@ -85,8 +97,15 @@ orthocal date 2026-04-12
 orthocal saints 2026-04-12
 orthocal readings 2026-04-12
 orthocal hymns 2026-04-12
+orthocal search saints John
+orthocal search western Osburga
+orthocal search primary Climacus
+orthocal search readings "John 20"
+orthocal search hymns resurrection
+orthocal search saints John --limit 50
 orthocal date 2026-04-12 --db ./orthodox-calendar.db --json
 orthocal saints 2026-04-12 --db ./orthodox-calendar.db --json
+orthocal search saints John --json
 orthocal info --db ./orthodox-calendar.db --json
 orthocal --db ./orthodox-calendar.db info
 orthocal update ./orthodox-calendar.db

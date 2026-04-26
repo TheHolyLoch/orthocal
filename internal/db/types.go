@@ -81,3 +81,54 @@ type ReadingsView struct {
 	Day               CalendarDay        `json:"day"`
 	ScriptureReadings []ScriptureReading `json:"scripture_readings"`
 }
+
+type SearchHymnsView struct {
+	Query    string             `json:"query"`
+	Category string             `json:"category"`
+	Limit    int                `json:"limit"`
+	Results  []SearchResultHymn `json:"results"`
+}
+
+type SearchReadingsView struct {
+	Query    string                `json:"query"`
+	Category string                `json:"category"`
+	Limit    int                   `json:"limit"`
+	Results  []SearchResultReading `json:"results"`
+}
+
+type SearchResultHymn struct {
+	GregorianDate string `json:"gregorian_date"`
+	JulianDate    string `json:"julian_date"`
+	SectionOrder  int    `json:"section_order"`
+	HymnOrder     int    `json:"hymn_order"`
+	HymnType      string `json:"hymn_type"`
+	Tone          string `json:"tone"`
+	Title         string `json:"title"`
+	TextPreview   string `json:"text_preview"`
+}
+
+type SearchResultReading struct {
+	GregorianDate  string `json:"gregorian_date"`
+	JulianDate     string `json:"julian_date"`
+	ReadingOrder   int    `json:"reading_order"`
+	VerseReference string `json:"verse_reference"`
+	Description    string `json:"description"`
+}
+
+type SearchResultSaint struct {
+	GregorianDate   string `json:"gregorian_date"`
+	JulianDate      string `json:"julian_date"`
+	SaintOrder      int    `json:"saint_order"`
+	Name            string `json:"name"`
+	ServiceRankCode string `json:"service_rank_code"`
+	ServiceRankName string `json:"service_rank_name"`
+	IsPrimary       bool   `json:"is_primary"`
+	IsWestern       bool   `json:"is_western"`
+}
+
+type SearchSaintsView struct {
+	Query    string              `json:"query"`
+	Category string              `json:"category"`
+	Limit    int                 `json:"limit"`
+	Results  []SearchResultSaint `json:"results"`
+}

@@ -129,6 +129,24 @@ func RenderSaintsJSON(view db.SaintsView) error {
 	return encoder.Encode(view)
 }
 
+func RenderSearchHymnsJSON(view db.SearchHymnsView) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "\t")
+	return encoder.Encode(view)
+}
+
+func RenderSearchReadingsJSON(view db.SearchReadingsView) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "\t")
+	return encoder.Encode(view)
+}
+
+func RenderSearchSaintsJSON(view db.SearchSaintsView) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "\t")
+	return encoder.Encode(view)
+}
+
 func Saints(output io.Writer, view db.SaintsView) {
 	fmt.Fprintf(output, "%s / %s\n", format_gregorian_date(view.Day), format_julian_date(view.Day.JulianDate))
 	fmt.Fprintln(output)
@@ -141,6 +159,48 @@ func Saints(output io.Writer, view db.SaintsView) {
 	fmt.Fprintln(output, "Saints:")
 	for _, saint := range view.Saints {
 		fmt.Fprintf(output, "\t%d. %s%s\n", saint.SaintOrder, saint_prefix(saint), saint.Name)
+	}
+}
+
+func SearchHymns(output io.Writer, view db.SearchHymnsView) {
+	if len(view.Results) == 0 {
+		fmt.Fprintln(output, "No hymn results found.")
+		return
+	}
+
+	for _, result := range view.Results {
+		label := search_hymn_label(result)
+		if label != "" {
+			fmt.Fprintf(output, "%s / %s  %s - %s\n", result.GregorianDate, result.JulianDate, label, result.TextPreview)
+		} else {
+			fmt.Fprintf(output, "%s / %s  %s\n", result.GregorianDate, result.JulianDate, result.TextPreview)
+		}
+	}
+}
+
+func SearchReadings(output io.Writer, view db.SearchReadingsView) {
+	if len(view.Results) == 0 {
+		fmt.Fprintln(output, "No scripture reading results found.")
+		return
+	}
+
+	for _, result := range view.Results {
+		if strings.TrimSpace(result.Description) != "" {
+			fmt.Fprintf(output, "%s / %s  %s - %s\n", result.GregorianDate, result.JulianDate, result.VerseReference, result.Description)
+		} else {
+			fmt.Fprintf(output, "%s / %s  %s\n", result.GregorianDate, result.JulianDate, result.VerseReference)
+		}
+	}
+}
+
+func SearchSaints(output io.Writer, view db.SearchSaintsView) {
+	if len(view.Results) == 0 {
+		fmt.Fprintln(output, "No saint results found.")
+		return
+	}
+
+	for _, result := range view.Results {
+		fmt.Fprintf(output, "%s / %s  %s %s%s\n", result.GregorianDate, result.JulianDate, search_saint_rank(result), result.Name, search_saint_markers(result))
 	}
 }
 
@@ -178,6 +238,50 @@ func format_julian_date(value string) string {
 	}
 
 	return parsed.Format("January 2, 2006")
+}
+
+func search_hymn_label(result db.SearchResultHymn) string {
+	parts := []string{}
+
+	if strings.TrimSpace(result.Title) != "" {
+		parts = append(parts, result.Title)
+	}
+
+	if strings.TrimSpace(result.HymnType) != "" {
+		parts = append(parts, result.HymnType)
+	}
+
+	if strings.TrimSpace(result.Tone) != "" {
+		parts = append(parts, result.Tone)
+	}
+
+	return strings.Join(parts, " ")
+}
+
+func search_saint_markers(result db.SearchResultSaint) string {
+	parts := []string{}
+
+	if result.IsPrimary {
+		parts = append(parts, "[primary]")
+	}
+
+	if result.IsWestern {
+		parts = append(parts, "[western]")
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+
+	return " " + strings.Join(parts, " ")
+}
+
+func search_saint_rank(result db.SearchResultSaint) string {
+	if strings.TrimSpace(result.ServiceRankName) == "" {
+		return fmt.Sprintf("[%s]", result.ServiceRankCode)
+	}
+
+	return fmt.Sprintf("[%s: %s]", result.ServiceRankCode, result.ServiceRankName)
 }
 
 func primary_saints(saints []db.Saint) []db.Saint {
