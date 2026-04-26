@@ -4,8 +4,10 @@
 package render
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -52,6 +54,18 @@ func Day(output io.Writer, view db.DayView) {
 			}
 		}
 	}
+}
+
+func RenderDayJSON(view db.DayView) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "\t")
+	return encoder.Encode(view)
+}
+
+func RenderInfoJSON(view db.InfoView) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "\t")
+	return encoder.Encode(view)
 }
 
 func format_gregorian_date(day db.CalendarDay) string {

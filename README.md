@@ -46,6 +46,12 @@ orthocal tomorrow --db ./orthodox-calendar.db
 orthocal date 2026-04-12 --db ./orthodox-calendar.db
 ```
 
+Print JSON:
+```sh
+orthocal date 2026-04-12 --db ./orthodox-calendar.db --json
+orthocal info --db ./orthodox-calendar.db --json
+```
+
 ## Database Path
 If `--db` is omitted, Orthocal checks paths in this order:
 
@@ -63,6 +69,8 @@ If `--db` is omitted, Orthocal checks paths in this order:
 orthocal today
 orthocal tomorrow
 orthocal date 2026-04-12
+orthocal date 2026-04-12 --db ./orthodox-calendar.db --json
+orthocal info --db ./orthodox-calendar.db --json
 orthocal --db ./orthodox-calendar.db info
 orthocal update ./orthodox-calendar.db
 ```

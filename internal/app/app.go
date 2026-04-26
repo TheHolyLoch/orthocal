@@ -153,6 +153,15 @@ func render_day(opts options, value string, stdout io.Writer, stderr io.Writer) 
 		return 1
 	}
 
+	if opts.json {
+		if err := render.RenderDayJSON(view); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+
+		return 0
+	}
+
 	render.Day(stdout, view)
 	return 0
 }
@@ -190,7 +199,10 @@ func run_info(opts options, args []string, stdout io.Writer, stderr io.Writer) i
 	}
 	defer conn.Close()
 
-	view := db.InfoView{DatabasePath: dbPath}
+	view := db.InfoView{
+		DatabasePath: dbPath,
+		Metadata:     []db.Metadata{},
+	}
 
 	metadata, err := db.MetadataRows(conn)
 	if err != nil {
@@ -205,31 +217,40 @@ func run_info(opts options, args []string, stdout io.Writer, stderr io.Writer) i
 	}
 
 	if count, err := db.CountRows(conn, "calendar_days"); err == nil {
-		view.CalendarDaysCount = count
+		view.Counts.CalendarDays = count
 	} else {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
 
 	if count, err := db.CountRows(conn, "saints"); err == nil {
-		view.SaintsCount = count
+		view.Counts.Saints = count
 	} else {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
 
 	if count, err := db.CountRows(conn, "scripture_readings"); err == nil {
-		view.ScriptureReadingsCount = count
+		view.Counts.ScriptureReadings = count
 	} else {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
 
 	if count, err := db.CountRows(conn, "hymns"); err == nil {
-		view.HymnsCount = count
+		view.Counts.Hymns = count
 	} else {
 		fmt.Fprintln(stderr, err)
 		return 1
+	}
+
+	if opts.json {
+		if err := render.RenderInfoJSON(view); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+
+		return 0
 	}
 
 	print_info(stdout, view)
@@ -248,10 +269,10 @@ func print_info(stdout io.Writer, view db.InfoView) {
 		}
 	}
 
-	fmt.Fprintf(stdout, "calendar_days: %d\n", view.CalendarDaysCount)
-	fmt.Fprintf(stdout, "saints: %d\n", view.SaintsCount)
-	fmt.Fprintf(stdout, "scripture_readings: %d\n", view.ScriptureReadingsCount)
-	fmt.Fprintf(stdout, "hymns: %d\n", view.HymnsCount)
+	fmt.Fprintf(stdout, "calendar_days: %d\n", view.Counts.CalendarDays)
+	fmt.Fprintf(stdout, "saints: %d\n", view.Counts.Saints)
+	fmt.Fprintf(stdout, "scripture_readings: %d\n", view.Counts.ScriptureReadings)
+	fmt.Fprintf(stdout, "hymns: %d\n", view.Counts.Hymns)
 }
 
 func run_today(opts options, args []string, stdout io.Writer, stderr io.Writer) int {

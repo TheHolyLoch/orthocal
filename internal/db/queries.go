@@ -86,8 +86,10 @@ func DayViewByGregorianDate(conn *sql.DB, value string) (DayView, bool, error) {
 
 	return DayView{
 		Day:               day,
-		Saints:            saints,
+		PrimarySaints:     primary_saints(saints),
+		WesternSaints:     western_saints(saints),
 		ScriptureReadings: scripture,
+		Saints:            saints,
 	}, true, nil
 }
 
@@ -245,6 +247,17 @@ func table_exists(conn *sql.DB, table string) (bool, error) {
 	return true, nil
 }
 
+func primary_saints(saints []Saint) []Saint {
+	filtered := []Saint{}
+	for _, saint := range saints {
+		if saint.IsPrimary {
+			filtered = append(filtered, saint)
+		}
+	}
+
+	return filtered
+}
+
 func valid_table_name(table string) bool {
 	if table == "" {
 		return false
@@ -257,4 +270,15 @@ func valid_table_name(table string) bool {
 	}
 
 	return !strings.HasPrefix(table, "sqlite_")
+}
+
+func western_saints(saints []Saint) []Saint {
+	filtered := []Saint{}
+	for _, saint := range saints {
+		if saint.IsWestern {
+			filtered = append(filtered, saint)
+		}
+	}
+
+	return filtered
 }
