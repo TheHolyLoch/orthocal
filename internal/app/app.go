@@ -15,6 +15,7 @@ import (
 	"orthocal/internal/config"
 	"orthocal/internal/db"
 	"orthocal/internal/render"
+	"orthocal/internal/server"
 	"orthocal/internal/update"
 )
 
@@ -30,11 +31,13 @@ Commands:
   hymns YYYY-MM-DD   Show hymns for a Gregorian date
   search CATEGORY QUERY
                      Search saints, western, primary, readings, or hymns
+  serve              Start the local read-only web server
   info               Show database metadata and counts
   update SOURCE      Replace the configured database
 
 Options:
   --db PATH          Use a specific SQLite database
+  --addr ADDRESS     Web server address, default 127.0.0.1:8080
   --plain            Disable terminal styling
   --json             Print JSON for supported commands
   --limit N          Limit search results, default 25, max 200
@@ -42,6 +45,7 @@ Options:
 `
 
 type options struct {
+	addr   string
 	dbPath string
 	help   bool
 	json   bool
@@ -94,6 +98,9 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	case "search":
 		return run_search(opts, commandArgs, stdout, stderr)
 
+	case "serve":
+		return run_serve(opts, commandArgs, stdout, stderr)
+
 	case "update":
 		return run_update(opts, commandArgs, stdout, stderr)
 
@@ -108,6 +115,7 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 func parse_options(args []string) (options, []string, error) {
 	opts := options{
+		addr:  "127.0.0.1:8080",
 		limit: 25,
 	}
 	rest := []string{}
@@ -128,6 +136,20 @@ func parse_options(args []string) (options, []string, error) {
 			opts.dbPath = strings.TrimPrefix(arg, "--db=")
 			if opts.dbPath == "" {
 				return options{}, nil, errors.New("error: --db requires PATH")
+			}
+
+		case arg == "--addr":
+			if index+1 >= len(args) {
+				return options{}, nil, errors.New("error: --addr requires ADDRESS")
+			}
+
+			index++
+			opts.addr = args[index]
+
+		case strings.HasPrefix(arg, "--addr="):
+			opts.addr = strings.TrimPrefix(arg, "--addr=")
+			if opts.addr == "" {
+				return options{}, nil, errors.New("error: --addr requires ADDRESS")
 			}
 
 		case arg == "--plain":
@@ -577,6 +599,50 @@ func run_saints(opts options, args []string, stdout io.Writer, stderr io.Writer)
 	}
 
 	render.Saints(stdout, view)
+	return 0
+}
+
+func run_serve(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 0 {
+		fmt.Fprintln(stderr, "error: serve does not accept arguments")
+		return 2
+	}
+
+	dbPath, err := config.ResolveDBPath(opts.dbPath)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	conn, err := db.Open(dbPath)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	defer conn.Close()
+
+	if _, err := db.InfoViewByPath(conn, dbPath); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	webServer, err := server.New(conn, server.Config{
+		Addr:         opts.addr,
+		DatabasePath: dbPath,
+	})
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "serving address: %s\n", opts.addr)
+	fmt.Fprintf(stdout, "database path: %s\n", dbPath)
+
+	if err := webServer.Serve(opts.addr); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
 	return 0
 }
 

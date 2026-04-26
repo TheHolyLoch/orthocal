@@ -25,17 +25,18 @@ go build ./cmd/orthocal
 orthocal [--db PATH] [--plain] [--json] COMMAND [ARGS]
 ```
 
-| Command                 | Description                         |
-| ----------------------- | ----------------------------------- |
-| `today`                 | Show the local system date          |
-| `tomorrow`              | Show the local system date plus one |
-| `date YYYY-MM-DD`       | Show a specific Gregorian date      |
-| `saints YYYY-MM-DD`     | Show saints for a Gregorian date    |
-| `readings YYYY-MM-DD`   | Show readings for a Gregorian date  |
-| `hymns YYYY-MM-DD`      | Show hymns for a Gregorian date     |
-| `search CATEGORY QUERY` | Search calendar data                |
-| `info`                  | Show database metadata and counts   |
-| `update SOURCE`         | Replace the configured database     |
+| Command                 | Description                          |
+| ----------------------- | ------------------------------------ |
+| `today`                 | Show the local system date           |
+| `tomorrow`              | Show the local system date plus one  |
+| `date YYYY-MM-DD`       | Show a specific Gregorian date       |
+| `saints YYYY-MM-DD`     | Show saints for a Gregorian date     |
+| `readings YYYY-MM-DD`   | Show readings for a Gregorian date   |
+| `hymns YYYY-MM-DD`      | Show hymns for a Gregorian date      |
+| `search CATEGORY QUERY` | Search calendar data                 |
+| `serve`                 | Start the local read-only web server |
+| `info`                  | Show database metadata and counts    |
+| `update SOURCE`         | Replace the configured database      |
 
 Show database information:
 ```sh
@@ -73,6 +74,26 @@ orthocal search saints John --db ./orthodox-calendar.db --json
 orthocal info --db ./orthodox-calendar.db --json
 ```
 
+Run the local web server:
+```sh
+orthocal serve --db ./orthodox-calendar.db
+orthocal serve --db ./orthodox-calendar.db --addr 127.0.0.1:9090
+```
+
+Server mode is read-only and binds to `127.0.0.1:8080` by default.
+
+API endpoints:
+
+| Endpoint                   | Description                  |
+| -------------------------- | ---------------------------- |
+| `/api/today`               | Today's calendar data        |
+| `/api/tomorrow`            | Tomorrow's calendar data     |
+| `/api/date/YYYY-MM-DD`     | Calendar data for a date     |
+| `/api/saints/YYYY-MM-DD`   | Saints for a date            |
+| `/api/readings/YYYY-MM-DD` | Readings for a date          |
+| `/api/hymns/YYYY-MM-DD`    | Hymns for a date             |
+| `/api/info`                | Database metadata and counts |
+
 ## Database Path
 If `--db` is omitted, Orthocal checks paths in this order:
 
@@ -103,6 +124,8 @@ orthocal search primary Climacus
 orthocal search readings "John 20"
 orthocal search hymns resurrection
 orthocal search saints John --limit 50
+orthocal serve --db ./orthodox-calendar.db
+orthocal serve --db ./orthodox-calendar.db --addr 127.0.0.1:9090
 orthocal date 2026-04-12 --db ./orthodox-calendar.db --json
 orthocal saints 2026-04-12 --db ./orthodox-calendar.db --json
 orthocal search saints John --json

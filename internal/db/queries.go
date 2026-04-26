@@ -181,6 +181,50 @@ func HymnsViewByGregorianDate(conn *sql.DB, value string) (HymnsView, bool, erro
 	}, true, nil
 }
 
+func InfoViewByPath(conn *sql.DB, path string) (InfoView, error) {
+	view := InfoView{
+		DatabasePath: path,
+		Metadata:     []Metadata{},
+	}
+
+	metadata, err := MetadataRows(conn)
+	if err != nil {
+		if errors.Is(err, ErrTableMissing) {
+			view.MetadataUnavailable = true
+		} else {
+			return InfoView{}, err
+		}
+	} else {
+		view.Metadata = metadata
+	}
+
+	if count, err := CountRows(conn, "calendar_days"); err == nil {
+		view.Counts.CalendarDays = count
+	} else {
+		return InfoView{}, err
+	}
+
+	if count, err := CountRows(conn, "saints"); err == nil {
+		view.Counts.Saints = count
+	} else {
+		return InfoView{}, err
+	}
+
+	if count, err := CountRows(conn, "scripture_readings"); err == nil {
+		view.Counts.ScriptureReadings = count
+	} else {
+		return InfoView{}, err
+	}
+
+	if count, err := CountRows(conn, "hymns"); err == nil {
+		view.Counts.Hymns = count
+	} else {
+		return InfoView{}, err
+	}
+
+	return view, nil
+}
+
 func MetadataRows(conn *sql.DB) ([]Metadata, error) {
 	exists, err := table_exists(conn, "app_metadata")
 	if err != nil {
