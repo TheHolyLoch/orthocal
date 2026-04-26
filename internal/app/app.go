@@ -12,6 +12,7 @@ import (
 
 	"orthocal/internal/config"
 	"orthocal/internal/db"
+	"orthocal/internal/render"
 )
 
 const usageText = `orthocal [--db PATH] [--plain] [--json] COMMAND [ARGS]
@@ -59,13 +60,13 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	switch command {
 	case "today":
-		return run_today(commandArgs, stdout, stderr)
+		return run_today(opts, commandArgs, stdout, stderr)
 
 	case "tomorrow":
-		return run_tomorrow(commandArgs, stdout, stderr)
+		return run_tomorrow(opts, commandArgs, stdout, stderr)
 
 	case "date":
-		return run_date(commandArgs, stdout, stderr)
+		return run_date(opts, commandArgs, stdout, stderr)
 
 	case "info":
 		return run_info(opts, commandArgs, stdout, stderr)
@@ -125,7 +126,38 @@ func print_usage(output io.Writer) {
 	fmt.Fprint(output, usageText)
 }
 
-func run_date(args []string, stdout io.Writer, stderr io.Writer) int {
+func open_day_view(opts options, value string) (db.DayView, bool, error) {
+	dbPath, err := config.ResolveDBPath(opts.dbPath)
+	if err != nil {
+		return db.DayView{}, false, err
+	}
+
+	conn, err := db.Open(dbPath)
+	if err != nil {
+		return db.DayView{}, false, err
+	}
+	defer conn.Close()
+
+	return db.DayViewByGregorianDate(conn, value)
+}
+
+func render_day(opts options, value string, stdout io.Writer, stderr io.Writer) int {
+	view, found, err := open_day_view(opts, value)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	if !found {
+		fmt.Fprintf(stderr, "date not found: %s\n", value)
+		return 1
+	}
+
+	render.Day(stdout, view)
+	return 0
+}
+
+func run_date(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "error: date requires YYYY-MM-DD")
 		return 2
@@ -136,8 +168,7 @@ func run_date(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 2
 	}
 
-	fmt.Fprintf(stdout, "date lookup for %s will be added in a later pass\n", args[0])
-	return 0
+	return render_day(opts, args[0], stdout, stderr)
 }
 
 func run_info(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
@@ -223,24 +254,24 @@ func print_info(stdout io.Writer, view db.InfoView) {
 	fmt.Fprintf(stdout, "hymns: %d\n", view.HymnsCount)
 }
 
-func run_today(args []string, stdout io.Writer, stderr io.Writer) int {
+func run_today(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) != 0 {
 		fmt.Fprintln(stderr, "error: today does not accept arguments")
 		return 2
 	}
 
-	fmt.Fprintln(stdout, "date lookup will be added in a later pass")
-	return 0
+	value := time.Now().Format("2006-01-02")
+	return render_day(opts, value, stdout, stderr)
 }
 
-func run_tomorrow(args []string, stdout io.Writer, stderr io.Writer) int {
+func run_tomorrow(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) != 0 {
 		fmt.Fprintln(stderr, "error: tomorrow does not accept arguments")
 		return 2
 	}
 
-	fmt.Fprintln(stdout, "date lookup will be added in a later pass")
-	return 0
+	value := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+	return render_day(opts, value, stdout, stderr)
 }
 
 func run_update(args []string, stdout io.Writer, stderr io.Writer) int {

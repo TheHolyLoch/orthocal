@@ -3,9 +3,21 @@
 
 package db
 
-type CalendarDay struct{}
+type CalendarDay struct {
+	ID               int
+	DataHeader       string
+	GregorianDate    string
+	GregorianWeekday string
+	JulianDate       string
+	HeaderHeader     string
+	FastingRule      string
+}
 
-type DayView struct{}
+type DayView struct {
+	Day               CalendarDay
+	Saints            []Saint
+	ScriptureReadings []ScriptureReading
+}
 
 type Hymn struct{}
 
@@ -24,6 +36,20 @@ type Metadata struct {
 	Value string
 }
 
-type Saint struct{}
+type Saint struct {
+	SaintOrder      int
+	Name            string
+	IconFile        string
+	IsPrimary       bool
+	IsWestern       bool
+	ServiceRankCode string
+	ServiceRankName string
+}
 
-type ScriptureReading struct{}
+type ScriptureReading struct {
+	ReadingOrder   int
+	VerseReference string
+	Description    string
+	ReadingURL     string
+	DisplayText    string
+}

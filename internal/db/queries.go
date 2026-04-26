@@ -34,6 +34,63 @@ func CountRows(conn *sql.DB, table string) (int, error) {
 	return count, nil
 }
 
+func DayByGregorianDate(conn *sql.DB, value string) (CalendarDay, bool, error) {
+	row := conn.QueryRow(`
+		SELECT
+			id,
+			dataheader,
+			gregorian_date,
+			gregorian_weekday,
+			julian_date,
+			headerheader,
+			fasting_rule
+		FROM calendar_days
+		WHERE gregorian_date = ?
+	`, value)
+
+	day := CalendarDay{}
+	if err := row.Scan(
+		&day.ID,
+		&day.DataHeader,
+		&day.GregorianDate,
+		&day.GregorianWeekday,
+		&day.JulianDate,
+		&day.HeaderHeader,
+		&day.FastingRule,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return CalendarDay{}, false, nil
+		}
+
+		return CalendarDay{}, false, err
+	}
+
+	return day, true, nil
+}
+
+func DayViewByGregorianDate(conn *sql.DB, value string) (DayView, bool, error) {
+	day, found, err := DayByGregorianDate(conn, value)
+	if err != nil || !found {
+		return DayView{}, found, err
+	}
+
+	saints, err := SaintsByDayID(conn, day.ID)
+	if err != nil {
+		return DayView{}, false, err
+	}
+
+	scripture, err := ScriptureByDayID(conn, day.ID)
+	if err != nil {
+		return DayView{}, false, err
+	}
+
+	return DayView{
+		Day:               day,
+		Saints:            saints,
+		ScriptureReadings: scripture,
+	}, true, nil
+}
+
 func MetadataRows(conn *sql.DB) ([]Metadata, error) {
 	exists, err := table_exists(conn, "app_metadata")
 	if err != nil {
@@ -65,6 +122,113 @@ func MetadataRows(conn *sql.DB) ([]Metadata, error) {
 	}
 
 	return metadata, nil
+}
+
+func SaintsByDayID(conn *sql.DB, dayID int) ([]Saint, error) {
+	exists, err := table_exists(conn, "saints")
+	if err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		return []Saint{}, nil
+	}
+
+	rows, err := conn.Query(`
+		SELECT
+			saint_order,
+			name,
+			icon_file,
+			is_primary,
+			is_western,
+			service_rank_code,
+			service_rank_name
+		FROM saints
+		WHERE day_id = ?
+		ORDER BY saint_order
+	`, dayID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	saints := []Saint{}
+	for rows.Next() {
+		item := Saint{}
+		isPrimary := 0
+		isWestern := 0
+
+		if err := rows.Scan(
+			&item.SaintOrder,
+			&item.Name,
+			&item.IconFile,
+			&isPrimary,
+			&isWestern,
+			&item.ServiceRankCode,
+			&item.ServiceRankName,
+		); err != nil {
+			return nil, err
+		}
+
+		item.IsPrimary = isPrimary == 1
+		item.IsWestern = isWestern == 1
+		saints = append(saints, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return saints, nil
+}
+
+func ScriptureByDayID(conn *sql.DB, dayID int) ([]ScriptureReading, error) {
+	exists, err := table_exists(conn, "scripture_readings")
+	if err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		return []ScriptureReading{}, nil
+	}
+
+	rows, err := conn.Query(`
+		SELECT
+			reading_order,
+			verse_reference,
+			description,
+			reading_url,
+			display_text
+		FROM scripture_readings
+		WHERE day_id = ?
+		ORDER BY reading_order
+	`, dayID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	readings := []ScriptureReading{}
+	for rows.Next() {
+		item := ScriptureReading{}
+		if err := rows.Scan(
+			&item.ReadingOrder,
+			&item.VerseReference,
+			&item.Description,
+			&item.ReadingURL,
+			&item.DisplayText,
+		); err != nil {
+			return nil, err
+		}
+
+		readings = append(readings, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return readings, nil
 }
 
 func table_exists(conn *sql.DB, table string) (bool, error) {

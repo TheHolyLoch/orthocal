@@ -2,7 +2,7 @@
 
 Orthocal is a native POSIX command line program for reading Orthodox Old Style calendar data from a local SQLite database.
 
-This pass supports database path resolution, SQLite opening, and the `info` command.
+This pass supports database path resolution, SQLite opening, `info`, `today`, `tomorrow`, and `date`.
 
 ## Table of Contents
 - [Requirements](#requirements)
@@ -37,6 +37,13 @@ Show database information:
 ```sh
 orthocal info
 orthocal info --db ./orthodox-calendar.db
+```
+
+Show calendar days:
+```sh
+orthocal today --db ./orthodox-calendar.db
+orthocal tomorrow --db ./orthodox-calendar.db
+orthocal date 2026-04-12 --db ./orthodox-calendar.db
 ```
 
 ## Database Path
