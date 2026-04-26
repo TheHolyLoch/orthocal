@@ -4,10 +4,15 @@
 package server
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -28,10 +33,170 @@ func New(conn *sql.DB, config Config) (*Server, error) {
 }
 
 func (server *Server) Serve(addr string) error {
+	return http.ListenAndServe(addr, server.Handler())
+}
+
+func (server *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	server.routes(mux)
 
-	return http.ListenAndServe(addr, mux)
+	return mux
+}
+
+func (server *Server) ExportWeb(outputDir string) (int, error) {
+	if info, err := os.Stat(outputDir); err == nil {
+		if !info.IsDir() {
+			return 0, errors.New("output path is an existing regular file")
+		}
+	} else if os.IsNotExist(err) {
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			return 0, err
+		}
+	} else {
+		return 0, err
+	}
+
+	dates, err := db.AllCalendarDates(server.conn)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(dates) == 0 {
+		return 0, errors.New("database has no calendar days")
+	}
+
+	indexDate := today()
+	if _, found, err := db.DayByGregorianDate(server.conn, indexDate); err != nil {
+		return 0, err
+	} else if !found {
+		indexDate = dates[0]
+	}
+
+	if err := write_file(filepath.Join(outputDir, "assets", "style.css"), []byte(stylesheet)); err != nil {
+		return 0, err
+	}
+	if err := write_file(filepath.Join(outputDir, "assets", "app.js"), []byte(javascript)); err != nil {
+		return 0, err
+	}
+
+	infoView, err := db.InfoViewByPath(server.conn, server.config.DatabasePath)
+	if err != nil {
+		return 0, err
+	}
+	if err := write_json_file(filepath.Join(outputDir, "api", "info.json"), infoView); err != nil {
+		return 0, err
+	}
+
+	for _, value := range dates {
+		if err := server.export_day(outputDir, value); err != nil {
+			return 0, err
+		}
+		if err := server.export_saints(outputDir, value); err != nil {
+			return 0, err
+		}
+		if err := server.export_readings(outputDir, value); err != nil {
+			return 0, err
+		}
+		if err := server.export_hymns(outputDir, value); err != nil {
+			return 0, err
+		}
+
+		view, found, err := db.DayViewByGregorianDate(server.conn, value)
+		if err != nil {
+			return 0, err
+		}
+		if !found {
+			continue
+		}
+		if err := write_json_file(filepath.Join(outputDir, "api", "date", value+".json"), view); err != nil {
+			return 0, err
+		}
+	}
+
+	indexBytes, err := server.render_day_bytes(indexDate, "./")
+	if err != nil {
+		return 0, err
+	}
+	if err := write_file(filepath.Join(outputDir, "index.html"), indexBytes); err != nil {
+		return 0, err
+	}
+
+	return len(dates), nil
+}
+
+func (server *Server) export_day(outputDir string, value string) error {
+	bytes, err := server.render_day_bytes(value, "../../")
+	if err != nil {
+		return err
+	}
+
+	return write_file(filepath.Join(outputDir, "dates", value, "index.html"), bytes)
+}
+
+func (server *Server) export_hymns(outputDir string, value string) error {
+	view, found, err := db.HymnsViewByGregorianDate(server.conn, value)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return errDateNotFound
+	}
+
+	bytes, err := server.render_template_bytes(PageData{
+		Active:    "hymns",
+		DateValue: value,
+		HymnsView: view,
+		Title:     "Hymns",
+	}, "../../")
+	if err != nil {
+		return err
+	}
+
+	return write_file(filepath.Join(outputDir, "hymns", value, "index.html"), bytes)
+}
+
+func (server *Server) export_readings(outputDir string, value string) error {
+	view, found, err := db.ReadingsViewByGregorianDate(server.conn, value)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return errDateNotFound
+	}
+
+	bytes, err := server.render_template_bytes(PageData{
+		Active:       "readings",
+		DateValue:    value,
+		ReadingsView: view,
+		Title:        "Readings",
+	}, "../../")
+	if err != nil {
+		return err
+	}
+
+	return write_file(filepath.Join(outputDir, "readings", value, "index.html"), bytes)
+}
+
+func (server *Server) export_saints(outputDir string, value string) error {
+	view, found, err := db.SaintsViewByGregorianDate(server.conn, value)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return errDateNotFound
+	}
+
+	bytes, err := server.render_template_bytes(PageData{
+		Active:     "saints",
+		DateValue:  value,
+		SaintsView: view,
+		Title:      "Saints",
+	}, "../../")
+	if err != nil {
+		return err
+	}
+
+	return write_file(filepath.Join(outputDir, "saints", value, "index.html"), bytes)
 }
 
 func (server *Server) routes(mux *http.ServeMux) {
@@ -52,8 +217,13 @@ func (server *Server) routes(mux *http.ServeMux) {
 }
 
 func (server *Server) handle_day(response http.ResponseWriter, request *http.Request) {
-	value, ok := route_date(response, request, "/date/")
+	value, status, message, ok := route_date(request, "/date/")
 	if !ok {
+		if status == http.StatusNotFound {
+			http.NotFound(response, request)
+		} else {
+			server.render_error(response, status, message)
+		}
 		return
 	}
 
@@ -61,8 +231,13 @@ func (server *Server) handle_day(response http.ResponseWriter, request *http.Req
 }
 
 func (server *Server) handle_hymns(response http.ResponseWriter, request *http.Request) {
-	value, ok := route_date(response, request, "/hymns/")
+	value, status, message, ok := route_date(request, "/hymns/")
 	if !ok {
+		if status == http.StatusNotFound {
+			http.NotFound(response, request)
+		} else {
+			server.render_error(response, status, message)
+		}
 		return
 	}
 
@@ -101,8 +276,13 @@ func (server *Server) handle_javascript(response http.ResponseWriter, request *h
 }
 
 func (server *Server) handle_readings(response http.ResponseWriter, request *http.Request) {
-	value, ok := route_date(response, request, "/readings/")
+	value, status, message, ok := route_date(request, "/readings/")
 	if !ok {
+		if status == http.StatusNotFound {
+			http.NotFound(response, request)
+		} else {
+			server.render_error(response, status, message)
+		}
 		return
 	}
 
@@ -127,8 +307,13 @@ func (server *Server) handle_readings(response http.ResponseWriter, request *htt
 }
 
 func (server *Server) handle_saints(response http.ResponseWriter, request *http.Request) {
-	value, ok := route_date(response, request, "/saints/")
+	value, status, message, ok := route_date(request, "/saints/")
 	if !ok {
+		if status == http.StatusNotFound {
+			http.NotFound(response, request)
+		} else {
+			server.render_error(response, status, message)
+		}
 		return
 	}
 
@@ -159,30 +344,46 @@ func (server *Server) handle_stylesheet(response http.ResponseWriter, request *h
 
 func (server *Server) render(response http.ResponseWriter, data PageData) {
 	response.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := server.templates.ExecuteTemplate(response, data.Active+"_page", data); err != nil {
+	bytes, err := server.render_template_bytes(data, "")
+	if err != nil {
 		http.Error(response, err.Error(), http.StatusInternalServerError)
+		return
 	}
+
+	response.Write(bytes)
 }
 
 func (server *Server) render_day(response http.ResponseWriter, value string) {
-	view, found, err := db.DayViewByGregorianDate(server.conn, value)
+	bytes, err := server.render_day_bytes(value, "")
 	if err != nil {
-		server.render_error(response, http.StatusInternalServerError, err.Error())
+		if errors.Is(err, errDateNotFound) {
+			server.render_not_found(response, value)
+		} else {
+			server.render_error(response, http.StatusInternalServerError, err.Error())
+		}
 		return
 	}
 
+	response.Header().Set("Content-Type", "text/html; charset=utf-8")
+	response.Write(bytes)
+}
+
+func (server *Server) render_day_bytes(value string, root string) ([]byte, error) {
+	view, found, err := db.DayViewByGregorianDate(server.conn, value)
+	if err != nil {
+		return nil, err
+	}
+
 	if !found {
-		server.render_not_found(response, value)
-		return
+		return nil, errDateNotFound
 	}
 
 	hymns, err := db.HymnsByDayID(server.conn, view.Day.ID)
 	if err != nil {
-		server.render_error(response, http.StatusInternalServerError, err.Error())
-		return
+		return nil, err
 	}
 
-	server.render(response, PageData{
+	return server.render_template_bytes(PageData{
 		Active:    "day",
 		DateValue: value,
 		DayView:   view,
@@ -191,7 +392,7 @@ func (server *Server) render_day(response http.ResponseWriter, value string) {
 		PrevDate:  shift_date(value, -1),
 		Title:     "Calendar",
 		Today:     today(),
-	})
+	}, root)
 }
 
 func (server *Server) render_error(response http.ResponseWriter, status int, message string) {
@@ -215,19 +416,84 @@ func (server *Server) render_not_found(response http.ResponseWriter, value strin
 	})
 }
 
-func route_date(response http.ResponseWriter, request *http.Request, prefix string) (string, bool) {
+func (server *Server) render_template_bytes(data PageData, root string) ([]byte, error) {
+	data = server.page_defaults(data, root)
+
+	buffer := bytes.Buffer{}
+	if err := server.templates.ExecuteTemplate(&buffer, data.Active+"_page", data); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func (server *Server) page_defaults(data PageData, root string) PageData {
+	if root == "" {
+		data.HomeLink = "/"
+		data.AssetPrefix = "/assets/"
+		data.APIPrefix = "/api/date/"
+		data.DayPrefix = "/date/"
+		data.SaintsPrefix = "/saints/"
+		data.ReadPrefix = "/readings/"
+		data.HymnsPrefix = "/hymns/"
+	} else {
+		data.HomeLink = root + "index.html"
+		data.AssetPrefix = root + "assets/"
+		data.APIPrefix = root + "api/date/"
+		data.APISuffix = ".json"
+		data.DayPrefix = root + "dates/"
+		data.SaintsPrefix = root + "saints/"
+		data.ReadPrefix = root + "readings/"
+		data.HymnsPrefix = root + "hymns/"
+		data.LinkSuffix = "/index.html"
+		data.StyleSheet = template.CSS(stylesheet)
+		data.AppScript = template.JS(javascript)
+	}
+
+	if data.Today == "" {
+		data.Today = today()
+	}
+
+	return data
+}
+
+func route_date(request *http.Request, prefix string) (string, int, string, bool) {
 	value := strings.TrimPrefix(request.URL.Path, prefix)
 	if strings.Contains(value, "/") {
-		http.NotFound(response, request)
-		return "", false
+		return "", http.StatusNotFound, "not found", false
 	}
 
 	if _, err := time.Parse("2006-01-02", value); err != nil {
-		http.Error(response, "invalid date", http.StatusBadRequest)
-		return "", false
+		return "", http.StatusBadRequest, "invalid date", false
 	}
 
-	return value, true
+	return value, http.StatusOK, "", true
+}
+
+var errDateNotFound = errors.New("date not found")
+
+func write_file(path string, content []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, content, 0644)
+}
+
+func write_json_file(path string, value any) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "\t")
+	return encoder.Encode(value)
 }
 
 func shift_date(value string, days int) string {

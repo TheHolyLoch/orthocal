@@ -32,6 +32,8 @@ Commands:
   search CATEGORY QUERY
                      Search saints, western, primary, readings, or hymns
   serve              Start the local read-only web server
+  export-web OUTPUT_DIR
+                     Export a static read-only website
   info               Show database metadata and counts
   update SOURCE      Replace the configured database
 
@@ -85,6 +87,9 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	case "hymns":
 		return run_hymns(opts, commandArgs, stdout, stderr)
+
+	case "export-web":
+		return run_export_web(opts, commandArgs, stdout, stderr)
 
 	case "info":
 		return run_info(opts, commandArgs, stdout, stderr)
@@ -287,6 +292,44 @@ func run_date(opts options, args []string, stdout io.Writer, stderr io.Writer) i
 	}
 
 	return render_day(opts, value, stdout, stderr)
+}
+
+func run_export_web(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "error: export-web requires OUTPUT_DIR")
+		return 2
+	}
+
+	dbPath, err := config.ResolveDBPath(opts.dbPath)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	conn, err := db.Open(dbPath)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	defer conn.Close()
+
+	webServer, err := server.New(conn, server.Config{
+		DatabasePath: dbPath,
+	})
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	count, err := webServer.ExportWeb(args[0])
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "output directory: %s\n", args[0])
+	fmt.Fprintf(stdout, "days exported: %d\n", count)
+	return 0
 }
 
 func run_hymns(opts options, args []string, stdout io.Writer, stderr io.Writer) int {

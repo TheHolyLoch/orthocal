@@ -11,25 +11,26 @@ const templates = `
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>{{.Title}} - Orthocal</title>
-	<link rel="stylesheet" href="/assets/style.css">
+	{{if .StyleSheet}}<style>{{.StyleSheet}}</style>{{else}}<link rel="stylesheet" href="{{.AssetPrefix}}style.css">{{end}}
 </head>
 <body>
 	<main class="page">
 		<header class="topbar">
-			<a class="brand" href="/">Orthocal</a>
+			<a class="brand" href="{{.HomeLink}}">Orthocal</a>
 			<nav class="nav" aria-label="Primary">
-				<a href="/date/{{.Today}}">Today</a>
-				{{if .DateValue}}<a href="/saints/{{.DateValue}}">Saints</a>{{end}}
-				{{if .DateValue}}<a href="/readings/{{.DateValue}}">Readings</a>{{end}}
-				{{if .DateValue}}<a href="/hymns/{{.DateValue}}">Hymns</a>{{end}}
-				{{if .DateValue}}<a href="/api/date/{{.DateValue}}">JSON</a>{{end}}
+				{{if .DateValue}}<a href="{{.DayPrefix}}{{.DateValue}}{{.LinkSuffix}}">Day</a>{{end}}
+				<a href="{{.DayPrefix}}{{.Today}}{{.LinkSuffix}}">Today</a>
+				{{if .DateValue}}<a href="{{.SaintsPrefix}}{{.DateValue}}{{.LinkSuffix}}">Saints</a>{{end}}
+				{{if .DateValue}}<a href="{{.ReadPrefix}}{{.DateValue}}{{.LinkSuffix}}">Readings</a>{{end}}
+				{{if .DateValue}}<a href="{{.HymnsPrefix}}{{.DateValue}}{{.LinkSuffix}}">Hymns</a>{{end}}
+				{{if .DateValue}}<a href="{{.APIPrefix}}{{.DateValue}}{{.APISuffix}}">API JSON</a>{{end}}
 			</nav>
 		</header>
 {{end}}
 
 {{define "footer"}}
 	</main>
-	<script src="/assets/app.js"></script>
+	{{if .AppScript}}<script>{{.AppScript}}</script>{{else}}<script src="{{.AssetPrefix}}app.js"></script>{{end}}
 </body>
 </html>
 {{end}}
@@ -42,9 +43,9 @@ const templates = `
 	{{if .DayView.Day.HeaderHeader}}<p class="subhead">{{.DayView.Day.HeaderHeader}}</p>{{end}}
 	{{if .DayView.Day.FastingRule}}<p class="fasting">{{.DayView.Day.FastingRule}}</p>{{end}}
 	<div class="controls">
-		<a class="button" href="/date/{{.PrevDate}}">Previous Day</a>
-		<a class="button" href="/date/{{.NextDate}}">Next Day</a>
-		<a class="button" href="/date/{{.Today}}">Today</a>
+		<a class="button" href="{{.DayPrefix}}{{.PrevDate}}{{.LinkSuffix}}">Previous Day</a>
+		<a class="button" href="{{.DayPrefix}}{{.NextDate}}{{.LinkSuffix}}">Next Day</a>
+		<a class="button" href="{{.DayPrefix}}{{.Today}}{{.LinkSuffix}}">Today</a>
 		<label>Date
 			<input data-date-picker type="date" value="{{.DateValue}}">
 		</label>
@@ -90,7 +91,7 @@ const templates = `
 	<article class="panel">
 		<h2>Hymns</h2>
 		<p>{{.HymnCount}} hymns available.</p>
-		<a href="/hymns/{{.DateValue}}">View hymns</a>
+		<a href="{{.HymnsPrefix}}{{.DateValue}}{{.LinkSuffix}}">View hymns</a>
 	</article>
 	{{end}}
 </section>
@@ -173,7 +174,7 @@ const templates = `
 	<h1>Date Not Found</h1>
 	<p class="subhead">{{.Error}}</p>
 	<div class="controls">
-		<a class="button" href="/date/{{.Today}}">Today</a>
+		<a class="button" href="{{.DayPrefix}}{{.Today}}{{.LinkSuffix}}">Today</a>
 		<label>Date
 			<input data-date-picker type="date" value="{{.DateValue}}">
 		</label>

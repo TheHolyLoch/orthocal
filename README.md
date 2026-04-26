@@ -35,6 +35,7 @@ orthocal [--db PATH] [--plain] [--json] COMMAND [ARGS]
 | `hymns YYYY-MM-DD`      | Show hymns for a Gregorian date      |
 | `search CATEGORY QUERY` | Search calendar data                 |
 | `serve`                 | Start the local read-only web server |
+| `export-web OUTPUT_DIR` | Export a static read-only website    |
 | `info`                  | Show database metadata and counts    |
 | `update SOURCE`         | Replace the configured database      |
 
@@ -82,6 +83,13 @@ orthocal serve --db ./orthodox-calendar.db --addr 127.0.0.1:9090
 
 Server mode is read-only and binds to `127.0.0.1:8080` by default.
 
+Export a static website:
+```sh
+orthocal export-web ./site --db ./orthodox-calendar.db
+```
+
+The export is static and read-only. Exported JSON is written under `api/`.
+
 API endpoints:
 
 | Endpoint                   | Description                  |
@@ -126,6 +134,7 @@ orthocal search hymns resurrection
 orthocal search saints John --limit 50
 orthocal serve --db ./orthodox-calendar.db
 orthocal serve --db ./orthodox-calendar.db --addr 127.0.0.1:9090
+orthocal export-web ./site --db ./orthodox-calendar.db
 orthocal date 2026-04-12 --db ./orthodox-calendar.db --json
 orthocal saints 2026-04-12 --db ./orthodox-calendar.db --json
 orthocal search saints John --json

@@ -17,15 +17,26 @@ type Config struct {
 
 type PageData struct {
 	Active       string
+	APIPrefix    string
+	APISuffix    string
+	AppScript    template.JS
+	AssetPrefix  string
 	DateValue    string
+	DayPrefix    string
 	DayView      db.DayView
 	Error        string
 	HymnCount    int
+	HymnsPrefix  string
 	HymnsView    db.HymnsView
+	HomeLink     string
+	LinkSuffix   string
 	NextDate     string
 	PrevDate     string
 	ReadingsView db.ReadingsView
+	ReadPrefix   string
 	SaintsView   db.SaintsView
+	SaintsPrefix string
+	StyleSheet   template.CSS
 	Title        string
 	Today        string
 }

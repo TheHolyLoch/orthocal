@@ -12,6 +12,30 @@ import (
 
 var ErrTableMissing = errors.New("table missing")
 
+func AllCalendarDates(conn *sql.DB) ([]string, error) {
+	rows, err := conn.Query("SELECT gregorian_date FROM calendar_days ORDER BY gregorian_date")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	dates := []string{}
+	for rows.Next() {
+		value := ""
+		if err := rows.Scan(&value); err != nil {
+			return nil, err
+		}
+
+		dates = append(dates, value)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return dates, nil
+}
+
 func ClampLimit(limit int) int {
 	if limit <= 0 {
 		return 25
@@ -52,6 +76,20 @@ func EscapeLikeQuery(query string) string {
 	query = strings.ReplaceAll(query, `_`, `\_`)
 
 	return query
+}
+
+func FirstCalendarDate(conn *sql.DB) (string, bool, error) {
+	value := ""
+	err := conn.QueryRow("SELECT gregorian_date FROM calendar_days ORDER BY gregorian_date LIMIT 1").Scan(&value)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", false, nil
+		}
+
+		return "", false, err
+	}
+
+	return value, true, nil
 }
 
 func DayByGregorianDate(conn *sql.DB, value string) (CalendarDay, bool, error) {
