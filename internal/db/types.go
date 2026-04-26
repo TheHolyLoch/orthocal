@@ -21,7 +21,19 @@ type DayView struct {
 	Saints            []Saint            `json:"saints"`
 }
 
-type Hymn struct{}
+type Hymn struct {
+	HymnOrder    int    `json:"hymn_order"`
+	SectionOrder int    `json:"section_order"`
+	HymnType     string `json:"hymn_type"`
+	Tone         string `json:"tone"`
+	Title        string `json:"title"`
+	Text         string `json:"text"`
+}
+
+type HymnsView struct {
+	Day   CalendarDay `json:"day"`
+	Hymns []Hymn      `json:"hymns"`
+}
 
 type InfoCounts struct {
 	CalendarDays      int `json:"calendar_days"`
@@ -52,10 +64,20 @@ type Saint struct {
 	ServiceRankName string `json:"service_rank_name"`
 }
 
+type SaintsView struct {
+	Day    CalendarDay `json:"day"`
+	Saints []Saint     `json:"saints"`
+}
+
 type ScriptureReading struct {
 	ReadingOrder   int    `json:"reading_order"`
 	VerseReference string `json:"verse_reference"`
 	Description    string `json:"description"`
 	ReadingURL     string `json:"reading_url"`
 	DisplayText    string `json:"display_text"`
+}
+
+type ReadingsView struct {
+	Day               CalendarDay        `json:"day"`
+	ScriptureReadings []ScriptureReading `json:"scripture_readings"`
 }

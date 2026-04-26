@@ -22,6 +22,10 @@ Commands:
   today              Show the local system date
   tomorrow           Show the local system date plus one
   date YYYY-MM-DD    Show a specific Gregorian date
+  saints YYYY-MM-DD  Show saints for a Gregorian date
+  readings YYYY-MM-DD
+                     Show scripture readings for a Gregorian date
+  hymns YYYY-MM-DD   Show hymns for a Gregorian date
   info               Show database metadata and counts
   update SOURCE      Replace the configured database
 
@@ -69,8 +73,17 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	case "date":
 		return run_date(opts, commandArgs, stdout, stderr)
 
+	case "hymns":
+		return run_hymns(opts, commandArgs, stdout, stderr)
+
 	case "info":
 		return run_info(opts, commandArgs, stdout, stderr)
+
+	case "readings":
+		return run_readings(opts, commandArgs, stdout, stderr)
+
+	case "saints":
+		return run_saints(opts, commandArgs, stdout, stderr)
 
 	case "update":
 		return run_update(opts, commandArgs, stdout, stderr)
@@ -142,6 +155,51 @@ func open_day_view(opts options, value string) (db.DayView, bool, error) {
 	return db.DayViewByGregorianDate(conn, value)
 }
 
+func open_hymns_view(opts options, value string) (db.HymnsView, bool, error) {
+	dbPath, err := config.ResolveDBPath(opts.dbPath)
+	if err != nil {
+		return db.HymnsView{}, false, err
+	}
+
+	conn, err := db.Open(dbPath)
+	if err != nil {
+		return db.HymnsView{}, false, err
+	}
+	defer conn.Close()
+
+	return db.HymnsViewByGregorianDate(conn, value)
+}
+
+func open_readings_view(opts options, value string) (db.ReadingsView, bool, error) {
+	dbPath, err := config.ResolveDBPath(opts.dbPath)
+	if err != nil {
+		return db.ReadingsView{}, false, err
+	}
+
+	conn, err := db.Open(dbPath)
+	if err != nil {
+		return db.ReadingsView{}, false, err
+	}
+	defer conn.Close()
+
+	return db.ReadingsViewByGregorianDate(conn, value)
+}
+
+func open_saints_view(opts options, value string) (db.SaintsView, bool, error) {
+	dbPath, err := config.ResolveDBPath(opts.dbPath)
+	if err != nil {
+		return db.SaintsView{}, false, err
+	}
+
+	conn, err := db.Open(dbPath)
+	if err != nil {
+		return db.SaintsView{}, false, err
+	}
+	defer conn.Close()
+
+	return db.SaintsViewByGregorianDate(conn, value)
+}
+
 func render_day(opts options, value string, stdout io.Writer, stderr io.Writer) int {
 	view, found, err := open_day_view(opts, value)
 	if err != nil {
@@ -168,17 +226,42 @@ func render_day(opts options, value string, stdout io.Writer, stderr io.Writer) 
 }
 
 func run_date(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
-	if len(args) != 1 {
-		fmt.Fprintln(stderr, "error: date requires YYYY-MM-DD")
+	value, ok := parse_date_argument(args, "date", stderr)
+	if !ok {
 		return 2
 	}
 
-	if _, err := time.Parse("2006-01-02", args[0]); err != nil {
-		fmt.Fprintln(stderr, "error: date must use YYYY-MM-DD")
+	return render_day(opts, value, stdout, stderr)
+}
+
+func run_hymns(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
+	value, ok := parse_date_argument(args, "hymns", stderr)
+	if !ok {
 		return 2
 	}
 
-	return render_day(opts, args[0], stdout, stderr)
+	view, found, err := open_hymns_view(opts, value)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	if !found {
+		fmt.Fprintf(stderr, "date not found: %s\n", value)
+		return 1
+	}
+
+	if opts.json {
+		if err := render.RenderHymnsJSON(view); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+
+		return 0
+	}
+
+	render.Hymns(stdout, view)
+	return 0
 }
 
 func run_info(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
@@ -276,6 +359,66 @@ func print_info(stdout io.Writer, view db.InfoView) {
 	fmt.Fprintf(stdout, "hymns: %d\n", view.Counts.Hymns)
 }
 
+func run_readings(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
+	value, ok := parse_date_argument(args, "readings", stderr)
+	if !ok {
+		return 2
+	}
+
+	view, found, err := open_readings_view(opts, value)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	if !found {
+		fmt.Fprintf(stderr, "date not found: %s\n", value)
+		return 1
+	}
+
+	if opts.json {
+		if err := render.RenderReadingsJSON(view); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+
+		return 0
+	}
+
+	render.Readings(stdout, view)
+	return 0
+}
+
+func run_saints(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
+	value, ok := parse_date_argument(args, "saints", stderr)
+	if !ok {
+		return 2
+	}
+
+	view, found, err := open_saints_view(opts, value)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	if !found {
+		fmt.Fprintf(stderr, "date not found: %s\n", value)
+		return 1
+	}
+
+	if opts.json {
+		if err := render.RenderSaintsJSON(view); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+
+		return 0
+	}
+
+	render.Saints(stdout, view)
+	return 0
+}
+
 func run_today(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) != 0 {
 		fmt.Fprintln(stderr, "error: today does not accept arguments")
@@ -321,4 +464,18 @@ func run_update(opts options, args []string, stdout io.Writer, stderr io.Writer)
 	}
 	fmt.Fprintln(stdout, "validation: ok")
 	return 0
+}
+
+func parse_date_argument(args []string, command string, stderr io.Writer) (string, bool) {
+	if len(args) != 1 {
+		fmt.Fprintf(stderr, "error: %s requires YYYY-MM-DD\n", command)
+		return "", false
+	}
+
+	if _, err := time.Parse("2006-01-02", args[0]); err != nil {
+		fmt.Fprintln(stderr, "error: date must use YYYY-MM-DD")
+		return "", false
+	}
+
+	return args[0], true
 }

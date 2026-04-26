@@ -25,13 +25,16 @@ go build ./cmd/orthocal
 orthocal [--db PATH] [--plain] [--json] COMMAND [ARGS]
 ```
 
-| Command              | Description                         |
-| -------------------- | ----------------------------------- |
-| `today`              | Show the local system date          |
-| `tomorrow`           | Show the local system date plus one |
-| `date YYYY-MM-DD`    | Show a specific Gregorian date      |
-| `info`               | Show database metadata and counts   |
-| `update SOURCE`      | Replace the configured database     |
+| Command               | Description                         |
+| --------------------- | ----------------------------------- |
+| `today`               | Show the local system date          |
+| `tomorrow`            | Show the local system date plus one |
+| `date YYYY-MM-DD`     | Show a specific Gregorian date      |
+| `saints YYYY-MM-DD`   | Show saints for a Gregorian date    |
+| `readings YYYY-MM-DD` | Show readings for a Gregorian date  |
+| `hymns YYYY-MM-DD`    | Show hymns for a Gregorian date     |
+| `info`                | Show database metadata and counts   |
+| `update SOURCE`       | Replace the configured database     |
 
 Show database information:
 ```sh
@@ -44,11 +47,17 @@ Show calendar days:
 orthocal today --db ./orthodox-calendar.db
 orthocal tomorrow --db ./orthodox-calendar.db
 orthocal date 2026-04-12 --db ./orthodox-calendar.db
+orthocal saints 2026-04-12 --db ./orthodox-calendar.db
+orthocal readings 2026-04-12 --db ./orthodox-calendar.db
+orthocal hymns 2026-04-12 --db ./orthodox-calendar.db
 ```
 
 Print JSON:
 ```sh
 orthocal date 2026-04-12 --db ./orthodox-calendar.db --json
+orthocal saints 2026-04-12 --db ./orthodox-calendar.db --json
+orthocal readings 2026-04-12 --db ./orthodox-calendar.db --json
+orthocal hymns 2026-04-12 --db ./orthodox-calendar.db --json
 orthocal info --db ./orthodox-calendar.db --json
 ```
 
@@ -73,7 +82,11 @@ One backup is kept at `<database>.bak`.
 orthocal today
 orthocal tomorrow
 orthocal date 2026-04-12
+orthocal saints 2026-04-12
+orthocal readings 2026-04-12
+orthocal hymns 2026-04-12
 orthocal date 2026-04-12 --db ./orthodox-calendar.db --json
+orthocal saints 2026-04-12 --db ./orthodox-calendar.db --json
 orthocal info --db ./orthodox-calendar.db --json
 orthocal --db ./orthodox-calendar.db info
 orthocal update ./orthodox-calendar.db

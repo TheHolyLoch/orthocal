@@ -93,6 +93,74 @@ func DayViewByGregorianDate(conn *sql.DB, value string) (DayView, bool, error) {
 	}, true, nil
 }
 
+func HymnsByDayID(conn *sql.DB, dayID int) ([]Hymn, error) {
+	exists, err := table_exists(conn, "hymns")
+	if err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		return []Hymn{}, nil
+	}
+
+	rows, err := conn.Query(`
+		SELECT
+			hymn_order,
+			section_order,
+			hymn_type,
+			tone,
+			title,
+			text
+		FROM hymns
+		WHERE day_id = ?
+		ORDER BY section_order, hymn_order
+	`, dayID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	hymns := []Hymn{}
+	for rows.Next() {
+		item := Hymn{}
+		if err := rows.Scan(
+			&item.HymnOrder,
+			&item.SectionOrder,
+			&item.HymnType,
+			&item.Tone,
+			&item.Title,
+			&item.Text,
+		); err != nil {
+			return nil, err
+		}
+
+		hymns = append(hymns, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return hymns, nil
+}
+
+func HymnsViewByGregorianDate(conn *sql.DB, value string) (HymnsView, bool, error) {
+	day, found, err := DayByGregorianDate(conn, value)
+	if err != nil || !found {
+		return HymnsView{}, found, err
+	}
+
+	hymns, err := HymnsByDayID(conn, day.ID)
+	if err != nil {
+		return HymnsView{}, false, err
+	}
+
+	return HymnsView{
+		Day:   day,
+		Hymns: hymns,
+	}, true, nil
+}
+
 func MetadataRows(conn *sql.DB) ([]Metadata, error) {
 	exists, err := table_exists(conn, "app_metadata")
 	if err != nil {
@@ -124,6 +192,23 @@ func MetadataRows(conn *sql.DB) ([]Metadata, error) {
 	}
 
 	return metadata, nil
+}
+
+func ReadingsViewByGregorianDate(conn *sql.DB, value string) (ReadingsView, bool, error) {
+	day, found, err := DayByGregorianDate(conn, value)
+	if err != nil || !found {
+		return ReadingsView{}, found, err
+	}
+
+	readings, err := ScriptureByDayID(conn, day.ID)
+	if err != nil {
+		return ReadingsView{}, false, err
+	}
+
+	return ReadingsView{
+		Day:               day,
+		ScriptureReadings: readings,
+	}, true, nil
 }
 
 func SaintsByDayID(conn *sql.DB, dayID int) ([]Saint, error) {
@@ -182,6 +267,23 @@ func SaintsByDayID(conn *sql.DB, dayID int) ([]Saint, error) {
 	}
 
 	return saints, nil
+}
+
+func SaintsViewByGregorianDate(conn *sql.DB, value string) (SaintsView, bool, error) {
+	day, found, err := DayByGregorianDate(conn, value)
+	if err != nil || !found {
+		return SaintsView{}, found, err
+	}
+
+	saints, err := SaintsByDayID(conn, day.ID)
+	if err != nil {
+		return SaintsView{}, false, err
+	}
+
+	return SaintsView{
+		Day:    day,
+		Saints: saints,
+	}, true, nil
 }
 
 func ScriptureByDayID(conn *sql.DB, dayID int) ([]ScriptureReading, error) {
