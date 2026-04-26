@@ -9,7 +9,20 @@ type DayView struct{}
 
 type Hymn struct{}
 
-type Metadata struct{}
+type InfoView struct {
+	DatabasePath           string
+	Metadata               []Metadata
+	MetadataUnavailable    bool
+	CalendarDaysCount      int
+	SaintsCount            int
+	ScriptureReadingsCount int
+	HymnsCount             int
+}
+
+type Metadata struct {
+	Key   string
+	Value string
+}
 
 type Saint struct{}
 

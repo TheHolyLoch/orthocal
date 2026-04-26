@@ -2,7 +2,7 @@
 
 Orthocal is a native POSIX command line program for reading Orthodox Old Style calendar data from a local SQLite database.
 
-This pass creates the CLI skeleton only. Database reads and update verification are added in later passes.
+This pass supports database path resolution, SQLite opening, and the `info` command.
 
 ## Table of Contents
 - [Requirements](#requirements)
@@ -33,8 +33,20 @@ orthocal [--db PATH] [--plain] [--json] COMMAND [ARGS]
 | `info`               | Show database metadata and counts   |
 | `update SOURCE`      | Replace the configured database     |
 
+Show database information:
+```sh
+orthocal info
+orthocal info --db ./orthodox-calendar.db
+```
+
 ## Database Path
-`--db PATH` is parsed now. Default path resolution is added in the next pass.
+If `--db` is omitted, Orthocal checks paths in this order:
+
+| Order | Path                                           |
+| ----- | ---------------------------------------------- |
+| 1     | `$ORTHOCAL_DB`                                 |
+| 2     | `$XDG_DATA_HOME/orthocal/orthodox-calendar.db` |
+| 3     | `~/.local/share/orthocal/orthodox-calendar.db` |
 
 ## Update Behavior
 `orthocal update SOURCE` validates that `SOURCE` was provided and prints a placeholder in this pass.

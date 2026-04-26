@@ -4,10 +4,14 @@
 package app
 
 import (
-	"flag"
+	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
+
+	"orthocal/internal/config"
+	"orthocal/internal/db"
 )
 
 const usageText = `orthocal [--db PATH] [--plain] [--json] COMMAND [ARGS]
@@ -34,8 +38,9 @@ type options struct {
 }
 
 func Run(args []string, stdout io.Writer, stderr io.Writer) int {
-	opts, rest, err := parse_options(args, stderr)
+	opts, rest, err := parse_options(args)
 	if err != nil {
+		fmt.Fprintln(stderr, err)
 		return 2
 	}
 
@@ -63,7 +68,7 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return run_date(commandArgs, stdout, stderr)
 
 	case "info":
-		return run_info(commandArgs, stdout, stderr)
+		return run_info(opts, commandArgs, stdout, stderr)
 
 	case "update":
 		return run_update(commandArgs, stdout, stderr)
@@ -77,24 +82,43 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	return 2
 }
 
-func parse_options(args []string, output io.Writer) (options, []string, error) {
+func parse_options(args []string) (options, []string, error) {
 	opts := options{}
+	rest := []string{}
 
-	flags := flag.NewFlagSet("orthocal", flag.ContinueOnError)
-	flags.SetOutput(output)
-	flags.StringVar(&opts.dbPath, "db", "", "Use a specific SQLite database")
-	flags.BoolVar(&opts.plain, "plain", false, "Disable terminal styling")
-	flags.BoolVar(&opts.json, "json", false, "Print JSON for today, tomorrow, and date")
-	flags.BoolVar(&opts.help, "help", false, "Print help text")
-	flags.Usage = func() {
-		print_usage(output)
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+
+		switch {
+		case arg == "--db":
+			if index+1 >= len(args) {
+				return options{}, nil, errors.New("error: --db requires PATH")
+			}
+
+			index++
+			opts.dbPath = args[index]
+
+		case strings.HasPrefix(arg, "--db="):
+			opts.dbPath = strings.TrimPrefix(arg, "--db=")
+			if opts.dbPath == "" {
+				return options{}, nil, errors.New("error: --db requires PATH")
+			}
+
+		case arg == "--plain":
+			opts.plain = true
+
+		case arg == "--json":
+			opts.json = true
+
+		case arg == "--help":
+			opts.help = true
+
+		default:
+			rest = append(rest, arg)
+		}
 	}
 
-	if err := flags.Parse(args); err != nil {
-		return options{}, nil, err
-	}
-
-	return opts, flags.Args(), nil
+	return opts, rest, nil
 }
 
 func print_usage(output io.Writer) {
@@ -116,14 +140,87 @@ func run_date(args []string, stdout io.Writer, stderr io.Writer) int {
 	return 0
 }
 
-func run_info(args []string, stdout io.Writer, stderr io.Writer) int {
+func run_info(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) != 0 {
 		fmt.Fprintln(stderr, "error: info does not accept arguments")
 		return 2
 	}
 
-	fmt.Fprintln(stdout, "DB support will be added in the next pass")
+	dbPath, err := config.ResolveDBPath(opts.dbPath)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	conn, err := db.Open(dbPath)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	defer conn.Close()
+
+	view := db.InfoView{DatabasePath: dbPath}
+
+	metadata, err := db.MetadataRows(conn)
+	if err != nil {
+		if errors.Is(err, db.ErrTableMissing) {
+			view.MetadataUnavailable = true
+		} else {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+	} else {
+		view.Metadata = metadata
+	}
+
+	if count, err := db.CountRows(conn, "calendar_days"); err == nil {
+		view.CalendarDaysCount = count
+	} else {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	if count, err := db.CountRows(conn, "saints"); err == nil {
+		view.SaintsCount = count
+	} else {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	if count, err := db.CountRows(conn, "scripture_readings"); err == nil {
+		view.ScriptureReadingsCount = count
+	} else {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	if count, err := db.CountRows(conn, "hymns"); err == nil {
+		view.HymnsCount = count
+	} else {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	print_info(stdout, view)
 	return 0
+}
+
+func print_info(stdout io.Writer, view db.InfoView) {
+	fmt.Fprintf(stdout, "database path: %s\n", view.DatabasePath)
+
+	if view.MetadataUnavailable {
+		fmt.Fprintln(stdout, "app_metadata: unavailable")
+	} else {
+		fmt.Fprintln(stdout, "app_metadata:")
+		for _, item := range view.Metadata {
+			fmt.Fprintf(stdout, "\t%s: %s\n", item.Key, item.Value)
+		}
+	}
+
+	fmt.Fprintf(stdout, "calendar_days: %d\n", view.CalendarDaysCount)
+	fmt.Fprintf(stdout, "saints: %d\n", view.SaintsCount)
+	fmt.Fprintf(stdout, "scripture_readings: %d\n", view.ScriptureReadingsCount)
+	fmt.Fprintf(stdout, "hymns: %d\n", view.HymnsCount)
 }
 
 func run_today(args []string, stdout io.Writer, stderr io.Writer) int {
