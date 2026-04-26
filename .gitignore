@@ -1,0 +1,35 @@
+.env
+*.db.bak
+/orthocal
+/dist/
+# Binaries
+orthocal
+orthocal.exe
+bin/
+
+# Go build/test output
+*.test
+*.out
+coverage.out
+
+# Local databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.bak
+
+# Local config/env
+.env
+
+# Logs/temp
+logs/
+tmp/
+*.log
+
+# Editor/OS files
+.DS_Store
+.vscode/
+.idea/
+AGENTS.md
