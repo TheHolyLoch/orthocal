@@ -13,6 +13,7 @@ import (
 	"orthocal/internal/config"
 	"orthocal/internal/db"
 	"orthocal/internal/render"
+	"orthocal/internal/update"
 )
 
 const usageText = `orthocal [--db PATH] [--plain] [--json] COMMAND [ARGS]
@@ -72,7 +73,7 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return run_info(opts, commandArgs, stdout, stderr)
 
 	case "update":
-		return run_update(commandArgs, stdout, stderr)
+		return run_update(opts, commandArgs, stdout, stderr)
 
 	case "help":
 		print_usage(stdout)
@@ -295,12 +296,29 @@ func run_tomorrow(opts options, args []string, stdout io.Writer, stderr io.Write
 	return render_day(opts, value, stdout, stderr)
 }
 
-func run_update(args []string, stdout io.Writer, stderr io.Writer) int {
+func run_update(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "error: update requires SOURCE")
 		return 2
 	}
 
-	fmt.Fprintf(stdout, "update support for %s will be added in a later pass\n", args[0])
+	targetPath, err := config.ResolveDBPath(opts.dbPath)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	result, err := update.UpdateDatabase(targetPath, args[0])
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "source: %s\n", result.Source)
+	fmt.Fprintf(stdout, "target path: %s\n", result.TargetPath)
+	if result.BackupCreated {
+		fmt.Fprintf(stdout, "backup path: %s\n", result.BackupPath)
+	}
+	fmt.Fprintln(stdout, "validation: ok")
 	return 0
 }
