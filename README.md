@@ -8,11 +8,11 @@ Schema version 4 databases include calculated calendar events, fasting seasons, 
 
 ### CLI
 
-![[preview-cli.jpg]]
+![orthocal today](preview-cli.jpg)
 
 ### Web App
 
-![[preview-serve.jpg]]
+![orthocal serve](preview-serve.jpg)
 
 ## Table of Contents
 - [Requirements](#requirements)
