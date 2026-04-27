@@ -6,7 +6,10 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"net/url"
 	"os"
+	"path/filepath"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -20,7 +23,7 @@ func Open(path string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	conn, err := sql.Open("sqlite", path)
+	conn, err := sql.Open("sqlite", sqlite_read_only_dsn(path))
 	if err != nil {
 		return nil, err
 	}
@@ -31,4 +34,21 @@ func Open(path string) (*sql.DB, error) {
 	}
 
 	return conn, nil
+}
+
+func sqlite_read_only_dsn(path string) string {
+	if strings.HasPrefix(path, "file:") {
+		return path
+	}
+
+	absolute, err := filepath.Abs(path)
+	if err == nil {
+		path = absolute
+	}
+
+	return (&url.URL{
+		Scheme:   "file",
+		Path:     path,
+		RawQuery: "mode=ro",
+	}).String()
 }

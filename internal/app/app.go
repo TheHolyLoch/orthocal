@@ -8,12 +8,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"orthocal/internal/config"
 	"orthocal/internal/db"
+	"orthocal/internal/platform"
 	"orthocal/internal/render"
 	"orthocal/internal/server"
 	"orthocal/internal/update"
@@ -200,9 +203,82 @@ func print_usage(output io.Writer) {
 	fmt.Fprint(output, usageText)
 }
 
+func harden_export_web(dbPath string, outputDir string) error {
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return err
+	}
+
+	if err := platform.UnveilReadOnly(dbPath); err != nil {
+		return err
+	}
+
+	if err := platform.UnveilReadWrite(outputDir); err != nil {
+		return err
+	}
+
+	if err := platform.UnveilNone(); err != nil {
+		return err
+	}
+
+	return platform.PledgeNetworkClient()
+}
+
+func harden_read_only_cli(dbPath string) error {
+	if err := platform.UnveilReadOnly(dbPath); err != nil {
+		return err
+	}
+
+	if err := platform.UnveilNone(); err != nil {
+		return err
+	}
+
+	return platform.PledgeCLI()
+}
+
+func harden_server(dbPath string) error {
+	if err := platform.UnveilReadOnly(dbPath); err != nil {
+		return err
+	}
+
+	if err := platform.UnveilNone(); err != nil {
+		return err
+	}
+
+	return platform.PledgeServer()
+}
+
+func harden_update(targetPath string, source string) error {
+	targetDir := filepath.Dir(targetPath)
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return err
+	}
+
+	if update.IsHTTPSource(source) {
+		return platform.PledgeNetworkClient()
+	}
+
+	if err := platform.UnveilReadOnly(source); err != nil {
+		return err
+	}
+
+	if err := platform.UnveilReadWrite(targetDir); err != nil {
+		return err
+	}
+
+	if err := platform.UnveilNone(); err != nil {
+		return err
+	}
+
+	return platform.PledgeNetworkClient()
+}
+
 func open_day_view(opts options, value string) (db.DayView, bool, error) {
 	dbPath, err := config.ResolveDBPath(opts.dbPath)
 	if err != nil {
+		return db.DayView{}, false, err
+	}
+
+	if err := harden_read_only_cli(dbPath); err != nil {
 		return db.DayView{}, false, err
 	}
 
@@ -221,6 +297,10 @@ func open_hymns_view(opts options, value string) (db.HymnsView, bool, error) {
 		return db.HymnsView{}, false, err
 	}
 
+	if err := harden_read_only_cli(dbPath); err != nil {
+		return db.HymnsView{}, false, err
+	}
+
 	conn, err := db.Open(dbPath)
 	if err != nil {
 		return db.HymnsView{}, false, err
@@ -236,6 +316,10 @@ func open_readings_view(opts options, value string) (db.ReadingsView, bool, erro
 		return db.ReadingsView{}, false, err
 	}
 
+	if err := harden_read_only_cli(dbPath); err != nil {
+		return db.ReadingsView{}, false, err
+	}
+
 	conn, err := db.Open(dbPath)
 	if err != nil {
 		return db.ReadingsView{}, false, err
@@ -248,6 +332,10 @@ func open_readings_view(opts options, value string) (db.ReadingsView, bool, erro
 func open_saints_view(opts options, value string) (db.SaintsView, bool, error) {
 	dbPath, err := config.ResolveDBPath(opts.dbPath)
 	if err != nil {
+		return db.SaintsView{}, false, err
+	}
+
+	if err := harden_read_only_cli(dbPath); err != nil {
 		return db.SaintsView{}, false, err
 	}
 
@@ -302,6 +390,11 @@ func run_export_web(opts options, args []string, stdout io.Writer, stderr io.Wri
 
 	dbPath, err := config.ResolveDBPath(opts.dbPath)
 	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	if err := harden_export_web(dbPath, args[0]); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
@@ -374,6 +467,11 @@ func run_info(opts options, args []string, stdout io.Writer, stderr io.Writer) i
 		return 1
 	}
 
+	if err := harden_read_only_cli(dbPath); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
 	conn, err := db.Open(dbPath)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -438,6 +536,11 @@ func run_search(opts options, args []string, stdout io.Writer, stderr io.Writer)
 
 	dbPath, err := config.ResolveDBPath(opts.dbPath)
 	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	if err := harden_read_only_cli(dbPath); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
@@ -653,6 +756,11 @@ func run_serve(opts options, args []string, stdout io.Writer, stderr io.Writer) 
 		return 1
 	}
 
+	if err := harden_server(dbPath); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
 	conn, err := db.Open(dbPath)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -713,6 +821,11 @@ func run_update(opts options, args []string, stdout io.Writer, stderr io.Writer)
 
 	targetPath, err := config.ResolveDBPath(opts.dbPath)
 	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	if err := harden_update(targetPath, args[0]); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}

@@ -9,9 +9,11 @@ Schema version 4 databases include calculated calendar events, fasting seasons, 
 ## Table of Contents
 - [Requirements](#requirements)
 - [Setup](#setup)
+- [Building from Source](#building-from-source)
 - [Usage](#usage)
 - [Database Path](#database-path)
 - [Update Behavior](#update-behavior)
+- [OpenBSD Notes](#openbsd-notes)
 - [Examples](#examples)
 
 ## Requirements
@@ -21,6 +23,30 @@ Schema version 4 databases include calculated calendar events, fasting seasons, 
 ```sh
 go build ./cmd/orthocal
 ```
+
+## Building from Source
+Build with Go directly:
+```sh
+go build -o bin/orthocal ./cmd/orthocal
+```
+
+Or use the Makefile:
+```sh
+make build
+make test
+make install
+```
+
+Makefile targets:
+
+| Target      | Description                        |
+| ----------- | ---------------------------------- |
+| `build`     | Build `bin/orthocal`               |
+| `test`      | Run `go test ./...`                |
+| `fmt`       | Run `gofmt` on Go files            |
+| `clean`     | Remove `bin/`                      |
+| `install`   | Install to `$(DESTDIR)$(BINDIR)`   |
+| `uninstall` | Remove `$(DESTDIR)$(BINDIR)` binary |
 
 ## Usage
 ```sh
@@ -123,6 +149,25 @@ If `--db` is omitted, Orthocal checks paths in this order:
 Validation requires `PRAGMA integrity_check` to return `ok`, an `app_metadata` table, and an `app_metadata` row with key `schema_version`.
 
 One backup is kept at `<database>.bak`.
+
+## OpenBSD Notes
+Orthocal includes OpenBSD `pledge(2)` and `unveil(2)` support. On non-OpenBSD systems these calls are no-ops.
+
+Hardening notes:
+- Read-only CLI commands unveil the configured database read-only and pledge `stdio rpath`.
+- Server mode unveils the configured database read-only and pledges `stdio rpath inet dns`.
+- Update mode uses a conservative pledge for local and HTTP updates because it needs read, write, create, rename, and metadata operations.
+- HTTP update mode does not unveil paths before download so HTTPS certificate loading keeps working.
+
+The web server binds to `127.0.0.1:8080` by default.
+
+OpenBSD rc.d example:
+```sh
+cp packaging/openbsd/orthocal.rc /etc/rc.d/orthocal
+rcctl enable orthocal
+rcctl set orthocal flags "serve --db /var/db/orthocal/orthodox-calendar.db --addr 127.0.0.1:8080"
+rcctl start orthocal
+```
 
 ## Examples
 ```sh

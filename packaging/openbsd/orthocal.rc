@@ -1,0 +1,12 @@
+#!/bin/ksh
+# Orthocal - Developed by dgm (dgm@tuta.com)
+# orthocal/packaging/openbsd/orthocal.rc
+
+daemon="/usr/local/bin/orthocal"
+daemon_flags="serve --db /var/db/orthocal/orthodox-calendar.db --addr 127.0.0.1:8080"
+
+. /etc/rc.d/rc.subr
+
+rc_reload=NO
+
+rc_cmd $1

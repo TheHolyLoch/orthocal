@@ -1,0 +1,3 @@
+@comment Orthocal - Developed by dgm (dgm@tuta.com)
+@comment orthocal/packaging/openbsd/PLIST
+@bin bin/orthocal
