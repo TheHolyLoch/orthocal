@@ -1,6 +1,8 @@
 # Orthocal
 
-Orthocal is a native POSIX command line program for reading Orthodox Old Style calendar data from a local SQLite database.
+Orthocal is a native POSIX command line program written in [Go](https://golang.org) with optional Web App HTTPd and JSON API interface for reading Orthodox Old Style calendar data from a local SQLite database.
+
+Default data and calculations are based on that of the [Holy Trinity Russian Orthodox Church](https://www.holytrinityorthodox.com/htc/orthodox-calendar/).
 
 Schema version 4 databases include calculated calendar events, fasting seasons, fast-free periods, remembrances, and calculated fasting levels.
 
