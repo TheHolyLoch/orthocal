@@ -453,8 +453,6 @@ func (server *Server) page_defaults(data PageData, root string) PageData {
 		data.ReadPrefix = root + "readings/"
 		data.HymnsPrefix = root + "hymns/"
 		data.LinkSuffix = "/index.html"
-		data.StyleSheet = template.CSS(stylesheet)
-		data.AppScript = template.JS(javascript)
 	}
 
 	if data.Today == "" {
