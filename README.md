@@ -32,6 +32,7 @@ Schema version 4 databases include calculated calendar events, fasting seasons, 
 
 ## Requirements
 - [Go](https://go.dev)
+- Comaptible [Calendar database](https://github.com/TheHolyLoch/orthodox-calendar) (sqlite3)
 
 ## Setup
 ```sh
