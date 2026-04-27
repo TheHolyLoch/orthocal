@@ -7,7 +7,6 @@ orthocal.exe
 *.out
 coverage.out
 
-*.db
 *.db-shm
 *.db-wal
 *.sqlite
