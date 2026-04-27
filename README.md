@@ -4,6 +4,16 @@ Orthocal is a native POSIX command line program for reading Orthodox Old Style c
 
 Schema version 4 databases include calculated calendar events, fasting seasons, fast-free periods, remembrances, and calculated fasting levels.
 
+## Preview
+
+### CLI
+
+![[preview-cli.jpg]]
+
+### Web App
+
+![[preview-serve.jpg]]
+
 ## Table of Contents
 - [Requirements](#requirements)
 - [Setup](#setup)
