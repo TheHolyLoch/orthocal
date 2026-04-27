@@ -1,0 +1,97 @@
+.\" Orthocal - Developed by dgm (dgm@tuta.com)
+.\" orthocal/docs/orthocal.1
+.Dd April 27, 2026
+.Dt ORTHOCAL 1
+.Os
+.Sh NAME
+.Nm orthocal
+.Nd Orthodox Old Style calendar CLI and local web viewer
+.Sh SYNOPSIS
+.Nm
+.Op Fl -db Ar path
+.Op Fl -plain
+.Op Fl -json
+.Ar command
+.Op Ar arguments
+.Sh DESCRIPTION
+.Nm
+reads Orthodox Old Style calendar data from a local SQLite database.
+It can print day views, focused saints, readings, hymns, search results,
+database metadata, and serve or export a read-only web interface.
+.Pp
+The supported database schema version is 4.
+Older databases continue to run with degraded event support.
+Newer databases show a compatibility warning in
+.Cm info .
+.Sh COMMANDS
+.Bl -tag -width Ds
+.It Cm today
+Show the local system date.
+.It Cm tomorrow
+Show the local system date plus one.
+.It Cm date Ar YYYY-MM-DD
+Show a specific Gregorian date.
+.It Cm saints Ar YYYY-MM-DD
+Show saints for a Gregorian date.
+.It Cm readings Ar YYYY-MM-DD
+Show scripture readings for a Gregorian date.
+.It Cm hymns Ar YYYY-MM-DD
+Show hymns for a Gregorian date.
+.It Cm search Ar category Ar query
+Search saints, western saints, primary saints, readings, hymns, or events.
+.It Cm info
+Show version, database path, schema compatibility, metadata, and counts.
+.It Cm update Ar source
+Replace the configured database after validation.
+Use
+.Fl -force
+to allow a newer schema version.
+.It Cm serve
+Start the local read-only web server.
+The default address is
+.Pa 127.0.0.1:8080 .
+.It Cm export-web Ar output_dir
+Export a static read-only website.
+.It Cm version
+Show version and build information.
+.It Cm help
+Show help text.
+.El
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa ~/.local/share/orthocal/orthodox-calendar.db
+Default database path when
+.Ev ORTHOCAL_DB
+and
+.Ev XDG_DATA_HOME
+are unset.
+.It Pa $XDG_DATA_HOME/orthocal/orthodox-calendar.db
+Database path when
+.Ev XDG_DATA_HOME
+is set.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width Ds
+.It Ev ORTHOCAL_DB
+Database path used when
+.Fl -db
+is not passed.
+.It Ev XDG_DATA_HOME
+Base data directory used when
+.Ev ORTHOCAL_DB
+is unset.
+.El
+.Sh EXAMPLES
+.Bd -literal -offset indent
+orthocal today --db ./orthodox-calendar.db
+orthocal date 2026-04-12 --json --db ./orthodox-calendar.db
+orthocal search events Pascha --db ./orthodox-calendar.db
+orthocal serve --db ./orthodox-calendar.db
+orthocal export-web ./site --db ./orthodox-calendar.db
+orthocal update ./orthodox-calendar.db --db ~/.local/share/orthocal/orthodox-calendar.db
+orthocal version
+.Ed
+.Sh AUTHORS
+.An dgm Aq Mt dgm@tuta.com
+.Sh LICENSE
+ISC License.

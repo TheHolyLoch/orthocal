@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"orthocal/internal/db"
+	"orthocal/internal/version"
 )
 
 func New(conn *sql.DB, config Config) (*Server, error) {
@@ -83,6 +84,7 @@ func (server *Server) ExportWeb(outputDir string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	infoView.Version = version.Current().Version
 	if err := write_json_file(filepath.Join(outputDir, "api", "info.json"), infoView); err != nil {
 		return 0, err
 	}

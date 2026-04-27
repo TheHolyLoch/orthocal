@@ -21,6 +21,8 @@ type UpdateResult struct {
 	BackupPath    string
 	BackupCreated bool
 	BytesWritten  int64
+	SchemaVersion int
+	SchemaForced  bool
 }
 
 func IsHTTPSource(source string) bool {
@@ -32,7 +34,7 @@ func IsHTTPSource(source string) bool {
 	return parsed.Scheme == "http" || parsed.Scheme == "https"
 }
 
-func UpdateDatabase(targetPath string, source string) (UpdateResult, error) {
+func UpdateDatabase(targetPath string, source string, force bool) (UpdateResult, error) {
 	if source == "" {
 		return UpdateResult{}, errors.New("update source is required")
 	}
@@ -91,9 +93,12 @@ func UpdateDatabase(targetPath string, source string) (UpdateResult, error) {
 		return UpdateResult{}, errors.New("source produced an empty database file")
 	}
 
-	if err := ValidateDatabase(tempPath); err != nil {
+	validation, err := ValidateDatabase(tempPath, force)
+	if err != nil {
 		return UpdateResult{}, err
 	}
+	result.SchemaVersion = validation.SchemaVersion
+	result.SchemaForced = validation.Forced
 
 	if _, err := os.Stat(targetPath); err == nil {
 		if err := os.Remove(result.BackupPath); err != nil && !os.IsNotExist(err) {

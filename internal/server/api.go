@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"orthocal/internal/db"
+	"orthocal/internal/version"
 )
 
 func (server *Server) handle_api_date(response http.ResponseWriter, request *http.Request) {
@@ -52,6 +53,7 @@ func (server *Server) handle_api_info(response http.ResponseWriter, request *htt
 		write_api_error(response, http.StatusInternalServerError, err.Error())
 		return
 	}
+	view.Version = version.Current().Version
 
 	write_json(response, http.StatusOK, view)
 }

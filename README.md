@@ -2,8 +2,6 @@
 
 Orthocal is a native POSIX command line program for reading Orthodox Old Style calendar data from a local SQLite database.
 
-This pass supports database path resolution, SQLite opening, `info`, `today`, `tomorrow`, and `date`.
-
 Schema version 4 databases include calculated calendar events, fasting seasons, fast-free periods, remembrances, and calculated fasting levels.
 
 ## Table of Contents
@@ -13,6 +11,9 @@ Schema version 4 databases include calculated calendar events, fasting seasons, 
 - [Usage](#usage)
 - [Database Path](#database-path)
 - [Update Behavior](#update-behavior)
+- [Schema Compatibility](#schema-compatibility)
+- [Shell Completions](#shell-completions)
+- [Manual Page](#manual-page)
 - [OpenBSD Notes](#openbsd-notes)
 - [Examples](#examples)
 
@@ -33,20 +34,24 @@ go build -o bin/orthocal ./cmd/orthocal
 Or use the Makefile:
 ```sh
 make build
+make build VERSION=0.1.0
 make test
 make install
 ```
 
 Makefile targets:
 
-| Target      | Description                        |
-| ----------- | ---------------------------------- |
-| `build`     | Build `bin/orthocal`               |
-| `test`      | Run `go test ./...`                |
-| `fmt`       | Run `gofmt` on Go files            |
-| `clean`     | Remove `bin/`                      |
-| `install`   | Install to `$(DESTDIR)$(BINDIR)`   |
-| `uninstall` | Remove `$(DESTDIR)$(BINDIR)` binary |
+| Target                | Description                                |
+| --------------------- | ------------------------------------------ |
+| `build`               | Build `bin/orthocal`                       |
+| `test`                | Run `go test ./...`                        |
+| `fmt`                 | Run `gofmt` on Go files                    |
+| `clean`               | Remove `bin/`                              |
+| `install`             | Install to `$(DESTDIR)$(BINDIR)`           |
+| `install-completions` | Install bash, zsh, and fish completions    |
+| `install-man`         | Install `docs/orthocal.1`                  |
+| `install-all`         | Install binary, completions, and man page  |
+| `uninstall`           | Remove installed binary, completions, page |
 
 ## Usage
 ```sh
@@ -66,11 +71,13 @@ orthocal [--db PATH] [--plain] [--json] COMMAND [ARGS]
 | `export-web OUTPUT_DIR` | Export a static read-only website    |
 | `info`                  | Show database metadata and counts    |
 | `update SOURCE`         | Replace the configured database      |
+| `version`               | Show version and build information   |
 
 Show database information:
 ```sh
 orthocal info
 orthocal info --db ./orthodox-calendar.db
+orthocal version
 ```
 
 Show calendar days:
@@ -148,7 +155,38 @@ If `--db` is omitted, Orthocal checks paths in this order:
 
 Validation requires `PRAGMA integrity_check` to return `ok`, an `app_metadata` table, and an `app_metadata` row with key `schema_version`.
 
+Newer schema versions are rejected unless `--force` is passed:
+```sh
+orthocal update ./orthodox-calendar.db --force
+```
+
 One backup is kept at `<database>.bak`.
+
+## Schema Compatibility
+Orthocal supports schema version 4. Older databases still run with degraded event support.
+
+`orthocal info` prints the detected schema version and compatibility message. Newer databases show a warning, but read-only commands continue if the required columns are still compatible.
+
+## Shell Completions
+Static completions are included for bash, zsh, and fish.
+
+Install them with:
+```sh
+make install-completions
+```
+
+The zsh completion is installed as `_orthocal`.
+
+## Manual Page
+Install the manual page with:
+```sh
+make install-man
+```
+
+Then read it with:
+```sh
+man orthocal
+```
 
 ## OpenBSD Notes
 Orthocal includes OpenBSD `pledge(2)` and `unveil(2)` support. On non-OpenBSD systems these calls are no-ops.
@@ -190,12 +228,14 @@ orthocal search saints John --limit 50
 orthocal serve --db ./orthodox-calendar.db
 orthocal serve --db ./orthodox-calendar.db --addr 127.0.0.1:9090
 orthocal export-web ./site --db ./orthodox-calendar.db
+orthocal version
 orthocal date 2026-04-12 --db ./orthodox-calendar.db --json
 orthocal saints 2026-04-12 --db ./orthodox-calendar.db --json
 orthocal search saints John --json
 orthocal info --db ./orthodox-calendar.db --json
 orthocal --db ./orthodox-calendar.db info
 orthocal update ./orthodox-calendar.db
+orthocal update ./orthodox-calendar.db --force
 orthocal update ./orthodox-calendar.db --db ~/.local/share/orthocal/orthodox-calendar.db
 orthocal update https://example.org/orthodox-calendar.db
 ```

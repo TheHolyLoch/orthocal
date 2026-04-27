@@ -112,7 +112,7 @@ func test_server_db(t *testing.T, path string) *sql.DB {
 
 	statements := []string{
 		`CREATE TABLE app_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
-		`INSERT INTO app_metadata (key, value) VALUES ('schema_version', 'test')`,
+		`INSERT INTO app_metadata (key, value) VALUES ('schema_version', '4')`,
 		`CREATE TABLE calendar_days (
 			id INTEGER PRIMARY KEY,
 			dataheader TEXT NOT NULL,

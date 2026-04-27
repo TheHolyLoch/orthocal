@@ -82,16 +82,27 @@ type InfoCounts struct {
 }
 
 type InfoView struct {
-	DatabasePath        string     `json:"database_path"`
-	Metadata            []Metadata `json:"metadata"`
-	Counts              InfoCounts `json:"counts"`
-	SchemaNote          string     `json:"schema_note,omitempty"`
-	MetadataUnavailable bool       `json:"-"`
+	Version             string              `json:"version"`
+	DatabasePath        string              `json:"database_path"`
+	Compatibility       CompatibilityStatus `json:"compatibility"`
+	Metadata            []Metadata          `json:"metadata"`
+	Counts              InfoCounts          `json:"counts"`
+	SchemaNote          string              `json:"schema_note,omitempty"`
+	MetadataUnavailable bool                `json:"-"`
 }
 
 type Metadata struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
+}
+
+type CompatibilityStatus struct {
+	SchemaVersion    int    `json:"schema_version"`
+	SchemaKnown      bool   `json:"schema_known"`
+	SupportedVersion int    `json:"supported_version"`
+	IsNewer          bool   `json:"is_newer"`
+	IsOlder          bool   `json:"is_older"`
+	Message          string `json:"message"`
 }
 
 type Saint struct {

@@ -38,10 +38,10 @@ func TestUpdateDatabaseCreatesBackup(t *testing.T) {
 	source := filepath.Join(tempDir, "source.db")
 	target := filepath.Join(tempDir, "target.db")
 
-	create_update_db(t, source, true, true)
-	create_update_db(t, target, true, true)
+	create_update_db(t, source, true, "4")
+	create_update_db(t, target, true, "4")
 
-	result, err := UpdateDatabase(target, source)
+	result, err := UpdateDatabase(target, source, false)
 	if err != nil {
 		t.Fatalf("UpdateDatabase returned error: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestUpdateDatabaseCreatesBackup(t *testing.T) {
 		t.Fatalf("expected backup file: %v", err)
 	}
 
-	if err := ValidateDatabase(target); err != nil {
+	if _, err := ValidateDatabase(target, false); err != nil {
 		t.Fatalf("target failed validation: %v", err)
 	}
 }
@@ -64,9 +64,9 @@ func TestUpdateDatabaseCopiesLocalSource(t *testing.T) {
 	source := filepath.Join(tempDir, "source.db")
 	target := filepath.Join(tempDir, "nested", "target.db")
 
-	create_update_db(t, source, true, true)
+	create_update_db(t, source, true, "4")
 
-	result, err := UpdateDatabase(target, source)
+	result, err := UpdateDatabase(target, source, false)
 	if err != nil {
 		t.Fatalf("UpdateDatabase returned error: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestUpdateDatabaseCopiesLocalSource(t *testing.T) {
 		t.Fatal("did not expect backup")
 	}
 
-	if err := ValidateDatabase(target); err != nil {
+	if _, err := ValidateDatabase(target, false); err != nil {
 		t.Fatalf("target failed validation: %v", err)
 	}
 }
@@ -91,41 +91,59 @@ func TestUpdateDatabaseCopiesLocalSource(t *testing.T) {
 func TestUpdateDatabaseRejectsSamePath(t *testing.T) {
 	tempDir := t.TempDir()
 	source := filepath.Join(tempDir, "source.db")
-	create_update_db(t, source, true, true)
+	create_update_db(t, source, true, "4")
 
-	if _, err := UpdateDatabase(source, source); err == nil {
+	if _, err := UpdateDatabase(source, source, false); err == nil {
 		t.Fatal("expected same path error")
 	}
 }
 
 func TestValidateDatabaseAcceptsValidDB(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "valid.db")
-	create_update_db(t, path, true, true)
+	create_update_db(t, path, true, "4")
 
-	if err := ValidateDatabase(path); err != nil {
+	if _, err := ValidateDatabase(path, false); err != nil {
 		t.Fatalf("ValidateDatabase returned error: %v", err)
 	}
 }
 
 func TestValidateDatabaseRejectsMissingMetadata(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "missing-metadata.db")
-	create_update_db(t, path, false, false)
+	create_update_db(t, path, false, "")
 
-	if err := ValidateDatabase(path); err == nil {
+	if _, err := ValidateDatabase(path, false); err == nil {
 		t.Fatal("expected missing metadata error")
 	}
 }
 
 func TestValidateDatabaseRejectsMissingSchemaVersion(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "missing-schema-version.db")
-	create_update_db(t, path, true, false)
+	create_update_db(t, path, true, "")
 
-	if err := ValidateDatabase(path); err == nil {
+	if _, err := ValidateDatabase(path, false); err == nil {
 		t.Fatal("expected missing schema_version error")
 	}
 }
 
-func create_update_db(t *testing.T, path string, metadata bool, schemaVersion bool) {
+func TestValidateDatabaseRejectsNewerSchemaWithoutForce(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "newer-schema.db")
+	create_update_db(t, path, true, "5")
+
+	if _, err := ValidateDatabase(path, false); err == nil {
+		t.Fatal("expected newer schema error")
+	}
+
+	result, err := ValidateDatabase(path, true)
+	if err != nil {
+		t.Fatalf("ValidateDatabase force returned error: %v", err)
+	}
+
+	if !result.Forced || result.SchemaVersion != 5 {
+		t.Fatalf("unexpected validation result: %#v", result)
+	}
+}
+
+func create_update_db(t *testing.T, path string, metadata bool, schemaVersion string) {
 	t.Helper()
 
 	conn, err := sql.Open("sqlite", path)
@@ -144,8 +162,8 @@ func create_update_db(t *testing.T, path string, metadata bool, schemaVersion bo
 		}
 	}
 
-	if schemaVersion {
-		if _, err := conn.Exec(`INSERT INTO app_metadata (key, value) VALUES ('schema_version', 'test')`); err != nil {
+	if schemaVersion != "" {
+		if _, err := conn.Exec(`INSERT INTO app_metadata (key, value) VALUES ('schema_version', ?)`, schemaVersion); err != nil {
 			t.Fatalf("failed inserting schema_version: %v", err)
 		}
 	}

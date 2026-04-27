@@ -20,6 +20,7 @@ import (
 	"orthocal/internal/render"
 	"orthocal/internal/server"
 	"orthocal/internal/update"
+	"orthocal/internal/version"
 )
 
 const usageText = `orthocal [--db PATH] [--plain] [--json] COMMAND [ARGS]
@@ -34,6 +35,7 @@ Commands:
   hymns YYYY-MM-DD   Show hymns for a Gregorian date
   search CATEGORY QUERY
                      Search saints, western, primary, readings, hymns, or events
+  version            Show version and build information
   serve              Start the local read-only web server
   export-web OUTPUT_DIR
                      Export a static read-only website
@@ -46,12 +48,14 @@ Options:
   --plain            Disable terminal styling
   --json             Print JSON for supported commands
   --limit N          Limit search results, default 25, max 200
+  --force            Allow update to install a newer schema version
   --help             Print help text
 `
 
 type options struct {
 	addr   string
 	dbPath string
+	force  bool
 	help   bool
 	json   bool
 	limit  int
@@ -77,6 +81,11 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	command := rest[0]
 	commandArgs := rest[1:]
+
+	if opts.force && command != "update" {
+		fmt.Fprintln(stderr, "error: --force is only supported by update")
+		return 2
+	}
 
 	switch command {
 	case "today":
@@ -111,6 +120,9 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	case "update":
 		return run_update(opts, commandArgs, stdout, stderr)
+
+	case "version":
+		return run_version(opts, commandArgs, stdout, stderr)
 
 	case "help":
 		print_usage(stdout)
@@ -165,6 +177,9 @@ func parse_options(args []string) (options, []string, error) {
 
 		case arg == "--json":
 			opts.json = true
+
+		case arg == "--force":
+			opts.force = true
 
 		case arg == "--limit":
 			if index+1 >= len(args) {
@@ -484,6 +499,7 @@ func run_info(opts options, args []string, stdout io.Writer, stderr io.Writer) i
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
+	view.Version = version.Current().Version
 
 	if opts.json {
 		if err := render.RenderInfoJSON(view); err != nil {
@@ -499,7 +515,14 @@ func run_info(opts options, args []string, stdout io.Writer, stderr io.Writer) i
 }
 
 func print_info(stdout io.Writer, view db.InfoView) {
+	fmt.Fprintf(stdout, "version: %s\n", view.Version)
 	fmt.Fprintf(stdout, "database path: %s\n", view.DatabasePath)
+	if view.Compatibility.SchemaKnown {
+		fmt.Fprintf(stdout, "schema version: %d\n", view.Compatibility.SchemaVersion)
+	} else {
+		fmt.Fprintln(stdout, "schema version: unknown")
+	}
+	fmt.Fprintf(stdout, "compatibility: %s\n", view.Compatibility.Message)
 
 	if view.MetadataUnavailable {
 		fmt.Fprintln(stdout, "app_metadata: unavailable")
@@ -830,7 +853,7 @@ func run_update(opts options, args []string, stdout io.Writer, stderr io.Writer)
 		return 1
 	}
 
-	result, err := update.UpdateDatabase(targetPath, args[0])
+	result, err := update.UpdateDatabase(targetPath, args[0], opts.force)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
@@ -842,6 +865,27 @@ func run_update(opts options, args []string, stdout io.Writer, stderr io.Writer)
 		fmt.Fprintf(stdout, "backup path: %s\n", result.BackupPath)
 	}
 	fmt.Fprintln(stdout, "validation: ok")
+	if result.SchemaForced {
+		fmt.Fprintf(stdout, "schema: %d forced\n", result.SchemaVersion)
+	} else {
+		fmt.Fprintf(stdout, "schema: %d accepted\n", result.SchemaVersion)
+	}
+	return 0
+}
+
+func run_version(_ options, args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 0 {
+		fmt.Fprintln(stderr, "error: version does not accept arguments")
+		return 2
+	}
+
+	info := version.Current()
+	fmt.Fprintf(stdout, "program: %s\n", info.Program)
+	fmt.Fprintf(stdout, "version: %s\n", info.Version)
+	fmt.Fprintf(stdout, "commit: %s\n", info.Commit)
+	fmt.Fprintf(stdout, "build date: %s\n", info.BuildDate)
+	fmt.Fprintf(stdout, "go version: %s\n", info.GoVersion)
+	fmt.Fprintf(stdout, "os/arch: %s\n", info.OSArch)
 	return 0
 }
 

@@ -14,6 +14,8 @@ import (
 
 var ErrTableMissing = errors.New("table missing")
 
+const SupportedSchemaVersion = 4
+
 func AllCalendarDates(conn *sql.DB) ([]string, error) {
 	rows, err := conn.Query("SELECT gregorian_date FROM calendar_days ORDER BY gregorian_date")
 	if err != nil {
@@ -70,6 +72,37 @@ func CountRows(conn *sql.DB, table string) (int, error) {
 	}
 
 	return count, nil
+}
+
+func SchemaCompatibilityStatus(conn *sql.DB) (CompatibilityStatus, error) {
+	schemaVersion, known, err := SchemaVersion(conn)
+	if err != nil {
+		return CompatibilityStatus{}, err
+	}
+
+	status := CompatibilityStatus{
+		SchemaVersion:    schemaVersion,
+		SchemaKnown:      known,
+		SupportedVersion: SupportedSchemaVersion,
+	}
+
+	switch {
+	case !known:
+		status.Message = "schema_version is unknown"
+
+	case schemaVersion < SupportedSchemaVersion:
+		status.IsOlder = true
+		status.Message = "older database schema; calculated calendar events may be unavailable"
+
+	case schemaVersion > SupportedSchemaVersion:
+		status.IsNewer = true
+		status.Message = "newer database schema; read-only commands will try compatible queries"
+
+	default:
+		status.Message = "schema is compatible"
+	}
+
+	return status, nil
 }
 
 func EscapeLikeQuery(query string) string {
@@ -310,10 +343,14 @@ func InfoViewByPath(conn *sql.DB, path string) (InfoView, error) {
 		view.Metadata = metadata
 	}
 
-	if schemaVersion := metadata_value(view.Metadata, "schema_version"); schemaVersion != "" {
-		if version, err := strconv.Atoi(schemaVersion); err == nil && version < 4 {
-			view.SchemaNote = "database schema_version is below 4; calculated calendar events are unavailable"
-		}
+	compatibility, err := SchemaCompatibilityStatus(conn)
+	if err != nil {
+		return InfoView{}, err
+	}
+	view.Compatibility = compatibility
+
+	if compatibility.IsOlder {
+		view.SchemaNote = compatibility.Message
 	}
 
 	if count, err := CountRows(conn, "calendar_days"); err == nil {
@@ -353,6 +390,34 @@ func InfoViewByPath(conn *sql.DB, path string) (InfoView, error) {
 	}
 
 	return view, nil
+}
+
+func SchemaVersion(conn *sql.DB) (int, bool, error) {
+	exists, err := table_exists(conn, "app_metadata")
+	if err != nil {
+		return 0, false, err
+	}
+
+	if !exists {
+		return 0, false, nil
+	}
+
+	value := ""
+	err = conn.QueryRow("SELECT value FROM app_metadata WHERE key = 'schema_version'").Scan(&value)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, false, nil
+		}
+
+		return 0, false, err
+	}
+
+	version, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return 0, false, fmt.Errorf("invalid schema_version: %s", value)
+	}
+
+	return version, true, nil
 }
 
 func MetadataRows(conn *sql.DB) ([]Metadata, error) {

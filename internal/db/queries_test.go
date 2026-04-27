@@ -6,6 +6,7 @@ package db
 import (
 	"database/sql"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -186,6 +187,57 @@ func TestSearchQueries(t *testing.T) {
 	}
 }
 
+func TestSchemaVersion(t *testing.T) {
+	conn := schema_test_db(t, "4", true)
+	defer conn.Close()
+
+	version, known, err := SchemaVersion(conn)
+	if err != nil {
+		t.Fatalf("SchemaVersion returned error: %v", err)
+	}
+	if !known || version != 4 {
+		t.Fatalf("unexpected schema version: version=%d known=%v", version, known)
+	}
+}
+
+func TestCompatibilityStatus(t *testing.T) {
+	tests := []struct {
+		name        string
+		value       string
+		metadata    bool
+		known       bool
+		older       bool
+		newer       bool
+		version     int
+		messagePart string
+	}{
+		{name: "missing", metadata: false, known: false, messagePart: "unknown"},
+		{name: "older", value: "3", metadata: true, known: true, older: true, version: 3, messagePart: "older"},
+		{name: "current", value: "4", metadata: true, known: true, version: 4, messagePart: "compatible"},
+		{name: "newer", value: "5", metadata: true, known: true, newer: true, version: 5, messagePart: "newer"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			conn := schema_test_db(t, test.value, test.metadata)
+			defer conn.Close()
+
+			status, err := SchemaCompatibilityStatus(conn)
+			if err != nil {
+				t.Fatalf("SchemaCompatibilityStatus returned error: %v", err)
+			}
+
+			if status.SchemaKnown != test.known || status.IsOlder != test.older || status.IsNewer != test.newer || status.SchemaVersion != test.version {
+				t.Fatalf("unexpected status: %#v", status)
+			}
+
+			if !strings.Contains(status.Message, test.messagePart) {
+				t.Fatalf("expected message to contain %q, got %q", test.messagePart, status.Message)
+			}
+		})
+	}
+}
+
 func test_db(t *testing.T) *sql.DB {
 	t.Helper()
 
@@ -197,7 +249,7 @@ func test_db(t *testing.T) *sql.DB {
 
 	statements := []string{
 		`CREATE TABLE app_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
-		`INSERT INTO app_metadata (key, value) VALUES ('schema_version', 'test')`,
+		`INSERT INTO app_metadata (key, value) VALUES ('schema_version', '4')`,
 		`CREATE TABLE calendar_days (
 			id INTEGER PRIMARY KEY,
 			dataheader TEXT NOT NULL,
@@ -266,6 +318,32 @@ func test_db(t *testing.T) *sql.DB {
 		if _, err := conn.Exec(statement); err != nil {
 			conn.Close()
 			t.Fatalf("failed statement %q: %v", statement, err)
+		}
+	}
+
+	return conn
+}
+
+func schema_test_db(t *testing.T, schemaVersion string, metadata bool) *sql.DB {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "schema.db")
+	conn, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("sql.Open returned error: %v", err)
+	}
+
+	if metadata {
+		if _, err := conn.Exec(`CREATE TABLE app_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)`); err != nil {
+			conn.Close()
+			t.Fatalf("failed creating app_metadata: %v", err)
+		}
+
+		if schemaVersion != "" {
+			if _, err := conn.Exec(`INSERT INTO app_metadata (key, value) VALUES ('schema_version', ?)`, schemaVersion); err != nil {
+				conn.Close()
+				t.Fatalf("failed inserting schema_version: %v", err)
+			}
 		}
 	}
 
