@@ -31,8 +31,11 @@ func TestFrontendDate(t *testing.T) {
 	if !strings.Contains(response.Body.String(), "Sunday April 12, 2026 / March 30, 2026") {
 		t.Fatal("expected dataheader in HTML")
 	}
-	if !strings.Contains(response.Body.String(), "Primary Saints") {
-		t.Fatal("expected Primary Saints in HTML")
+	if !strings.Contains(response.Body.String(), "Saints") {
+		t.Fatal("expected Saints in HTML")
+	}
+	if !strings.Contains(response.Body.String(), "primary") {
+		t.Fatal("expected primary marker in HTML")
 	}
 }
 

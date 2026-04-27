@@ -25,21 +25,12 @@ func Day(output io.Writer, view db.DayView) {
 		fmt.Fprintf(output, "%s\n", view.Day.FastingRule)
 	}
 
-	primarySaints := primary_saints(view.Saints)
-	if len(primarySaints) > 0 {
+	saints := view.Saints
+	if len(saints) > 0 {
 		fmt.Fprintln(output)
-		fmt.Fprintln(output, "Primary saints:")
-		for index, saint := range primarySaints {
-			fmt.Fprintf(output, "\t%d. %s\n", index+1, saint.Name)
-		}
-	}
-
-	westernSaints := western_saints(view.Saints)
-	if len(westernSaints) > 0 {
-		fmt.Fprintln(output)
-		fmt.Fprintln(output, "Western saints:")
-		for _, saint := range westernSaints {
-			fmt.Fprintf(output, "\t- %s\n", saint.Name)
+		fmt.Fprintln(output, "Saints:")
+		for index, saint := range saints {
+			fmt.Fprintf(output, "\t%d. %s%s\n", index+1, saint_prefix(saint), saint.Name)
 		}
 	}
 
@@ -266,7 +257,7 @@ func search_saint_markers(result db.SearchResultSaint) string {
 	}
 
 	if result.IsWestern {
-		parts = append(parts, "[western]")
+		parts = append(parts, "[UK+IE]")
 	}
 
 	if len(parts) == 0 {
@@ -278,10 +269,11 @@ func search_saint_markers(result db.SearchResultSaint) string {
 
 func search_saint_rank(result db.SearchResultSaint) string {
 	if strings.TrimSpace(result.ServiceRankName) == "" {
-		return fmt.Sprintf("[%s]", result.ServiceRankCode)
+		// return fmt.Sprintf("[%s]", result.ServiceRankCode)
+		return ""
 	}
-
-	return fmt.Sprintf("[%s: %s]", result.ServiceRankCode, result.ServiceRankName)
+	return ""
+	// return fmt.Sprintf("[%s: %s]", result.ServiceRankCode, result.ServiceRankName)
 }
 
 func primary_saints(saints []db.Saint) []db.Saint {
@@ -298,16 +290,16 @@ func primary_saints(saints []db.Saint) []db.Saint {
 func saint_prefix(saint db.Saint) string {
 	parts := []string{}
 
-	if strings.TrimSpace(saint.ServiceRankCode) != "" || strings.TrimSpace(saint.ServiceRankName) != "" {
-		parts = append(parts, fmt.Sprintf("[%s: %s]", saint.ServiceRankCode, saint.ServiceRankName))
-	}
+	//	if strings.TrimSpace(saint.ServiceRankCode) != "" || strings.TrimSpace(saint.ServiceRankName) != "" {
+	//		parts = append(parts, fmt.Sprintf("[%s: %s]", saint.ServiceRankCode, saint.ServiceRankName))
+	//	}
 
 	if saint.IsPrimary {
 		parts = append(parts, "[primary]")
 	}
 
 	if saint.IsWestern {
-		parts = append(parts, "[western]")
+		parts = append(parts, "[UK+IE]")
 	}
 
 	if len(parts) == 0 {

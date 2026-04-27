@@ -7,6 +7,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -368,6 +370,7 @@ func SaintsByDayID(conn *sql.DB, dayID int) ([]Saint, error) {
 		return nil, err
 	}
 
+	sort_saints_for_day(saints)
 	return saints, nil
 }
 
@@ -622,6 +625,40 @@ func bool_int(value bool) int {
 	}
 
 	return 0
+}
+
+func saint_day_sort_key(saint Saint) (int, int) {
+	if saint.IsPrimary {
+		return 0, 0
+	}
+
+	if saint.IsWestern {
+		return 1, 0
+	}
+
+	rank, err := strconv.Atoi(saint.ServiceRankCode)
+	if err == nil && rank >= 0 && rank <= 6 {
+		return 2, rank
+	}
+
+	return 3, -1
+}
+
+func sort_saints_for_day(saints []Saint) {
+	sort.SliceStable(saints, func(left int, right int) bool {
+		leftGroup, leftRank := saint_day_sort_key(saints[left])
+		rightGroup, rightRank := saint_day_sort_key(saints[right])
+
+		if leftGroup != rightGroup {
+			return leftGroup < rightGroup
+		}
+
+		if leftRank != rightRank {
+			return leftRank > rightRank
+		}
+
+		return saints[left].SaintOrder < saints[right].SaintOrder
+	})
 }
 
 func table_exists(conn *sql.DB, table string) (bool, error) {

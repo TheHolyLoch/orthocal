@@ -53,26 +53,18 @@ const templates = `
 </section>
 
 <section class="grid">
-	{{if .DayView.PrimarySaints}}
+	{{if .DayView.Saints}}
 	<article class="panel">
-		<h2>Primary Saints</h2>
+		<h2>Saints</h2>
 		<ol>
-		{{range .DayView.PrimarySaints}}
-			<li>{{.Name}}</li>
+		{{range .DayView.Saints}}
+			<li>
+				{{if .ServiceRankCode}}[{{.ServiceRankCode}}] {{end}}{{.Name}}
+				{{if .IsPrimary}}<span class="tag">primary</span>{{end}}
+				{{if .IsWestern}}<span class="tag">western</span><span class="tag">Britain and Ireland</span>{{end}}
+			</li>
 		{{end}}
 		</ol>
-	</article>
-	{{end}}
-
-	{{if .DayView.WesternSaints}}
-	<article class="panel">
-		<h2>Western Saints</h2>
-		<div class="western-label">Western Saints of Britain and Ireland</div>
-		<ul>
-		{{range .DayView.WesternSaints}}
-			<li>{{.Name}}</li>
-		{{end}}
-		</ul>
 	</article>
 	{{end}}
 
@@ -110,7 +102,7 @@ const templates = `
 	<ol>
 	{{range .SaintsView.Saints}}
 		<li>
-			{{if .ServiceRankCode}}[{{.ServiceRankCode}}{{if .ServiceRankName}}: {{.ServiceRankName}}{{end}}] {{end}}{{.Name}}
+			{{if .ServiceRankCode}}[{{.ServiceRankCode}}] {{end}}{{.Name}}
 			{{if .IsPrimary}}<span class="tag">primary</span>{{end}}
 			{{if .IsWestern}}<span class="tag">western</span>{{end}}
 		</li>
