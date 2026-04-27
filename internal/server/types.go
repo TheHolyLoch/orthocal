@@ -25,6 +25,10 @@ type PageData struct {
 	DayPrefix    string
 	DayView      db.DayView
 	Error        string
+	FastFree     []string
+	FastingLevel string
+	Fasts        []string
+	Feasts       []string
 	HymnCount    int
 	HymnsPrefix  string
 	HymnsView    db.HymnsView
@@ -34,6 +38,7 @@ type PageData struct {
 	PrevDate     string
 	ReadingsView db.ReadingsView
 	ReadPrefix   string
+	Remembrances []string
 	SaintsView   db.SaintsView
 	SaintsPrefix string
 	StyleSheet   template.CSS

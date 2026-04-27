@@ -125,6 +125,17 @@ func DayByGregorianDate(conn *sql.DB, value string) (CalendarDay, bool, error) {
 		return CalendarDay{}, false, err
 	}
 
+	hasV4Columns, err := column_exists(conn, "calendar_days", "feasts")
+	if err != nil {
+		return CalendarDay{}, false, err
+	}
+
+	if hasV4Columns {
+		if err := scan_day_v4(conn, &day); err != nil {
+			return CalendarDay{}, false, err
+		}
+	}
+
 	return day, true, nil
 }
 
@@ -144,13 +155,74 @@ func DayViewByGregorianDate(conn *sql.DB, value string) (DayView, bool, error) {
 		return DayView{}, false, err
 	}
 
+	events, err := CalendarDayEventsByDayID(conn, day.ID)
+	if err != nil {
+		return DayView{}, false, err
+	}
+
 	return DayView{
 		Day:               day,
+		Events:            events,
+		FeastEvents:       feast_events(events),
+		FastEvents:        fast_events(events),
+		RemembranceEvents: remembrance_events(events),
+		FastFreeEvents:    fast_free_events(events),
 		PrimarySaints:     primary_saints(saints),
 		WesternSaints:     western_saints(saints),
 		ScriptureReadings: scripture,
 		Saints:            saints,
 	}, true, nil
+}
+
+func CalendarDayEventsByDayID(conn *sql.DB, dayID int) ([]CalendarDayEvent, error) {
+	exists, err := table_exists(conn, "calendar_day_events")
+	if err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		return []CalendarDayEvent{}, nil
+	}
+
+	rows, err := conn.Query(`
+		SELECT
+			day_id,
+			event_id,
+			event_date,
+			category,
+			title,
+			sort_order
+		FROM calendar_day_events
+		WHERE day_id = ?
+		ORDER BY sort_order, title
+	`, dayID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	events := []CalendarDayEvent{}
+	for rows.Next() {
+		item := CalendarDayEvent{}
+		if err := rows.Scan(
+			&item.DayID,
+			&item.EventID,
+			&item.EventDate,
+			&item.Category,
+			&item.Title,
+			&item.SortOrder,
+		); err != nil {
+			return nil, err
+		}
+
+		events = append(events, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return events, nil
 }
 
 func HymnsByDayID(conn *sql.DB, dayID int) ([]Hymn, error) {
@@ -238,8 +310,26 @@ func InfoViewByPath(conn *sql.DB, path string) (InfoView, error) {
 		view.Metadata = metadata
 	}
 
+	if schemaVersion := metadata_value(view.Metadata, "schema_version"); schemaVersion != "" {
+		if version, err := strconv.Atoi(schemaVersion); err == nil && version < 4 {
+			view.SchemaNote = "database schema_version is below 4; calculated calendar events are unavailable"
+		}
+	}
+
 	if count, err := CountRows(conn, "calendar_days"); err == nil {
 		view.Counts.CalendarDays = count
+	} else {
+		return InfoView{}, err
+	}
+
+	if count, err := CountRows(conn, "calendar_events"); err == nil {
+		view.Counts.CalendarEvents = count
+	} else {
+		return InfoView{}, err
+	}
+
+	if count, err := CountRows(conn, "calendar_day_events"); err == nil {
+		view.Counts.CalendarDayEvents = count
 	} else {
 		return InfoView{}, err
 	}
@@ -389,6 +479,65 @@ func SaintsViewByGregorianDate(conn *sql.DB, value string) (SaintsView, bool, er
 		Day:    day,
 		Saints: saints,
 	}, true, nil
+}
+
+func SearchEvents(conn *sql.DB, query string, category string, limit int) ([]SearchResultEvent, error) {
+	exists, err := table_exists(conn, "calendar_events")
+	if err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		return []SearchResultEvent{}, nil
+	}
+
+	likeQuery := "%" + EscapeLikeQuery(query) + "%"
+	categoryFilter := event_search_category(category)
+	rows, err := conn.Query(`
+		SELECT
+			category,
+			title,
+			start_date,
+			end_date,
+			is_range
+		FROM calendar_events
+		WHERE (title LIKE ? ESCAPE '\'
+			OR category LIKE ? ESCAPE '\'
+			OR notes LIKE ? ESCAPE '\')
+			AND (? = ''
+				OR (? = 'feast' AND category IN ('fixed_feast', 'movable_feast'))
+				OR category = ?)
+		ORDER BY start_date, sort_order, title
+		LIMIT ?
+	`, likeQuery, likeQuery, likeQuery, categoryFilter, categoryFilter, categoryFilter, ClampLimit(limit))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := []SearchResultEvent{}
+	for rows.Next() {
+		item := SearchResultEvent{}
+		isRange := 0
+		if err := rows.Scan(
+			&item.Category,
+			&item.Title,
+			&item.StartDate,
+			&item.EndDate,
+			&isRange,
+		); err != nil {
+			return nil, err
+		}
+
+		item.IsRange = isRange == 1
+		results = append(results, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
 }
 
 func SearchHymns(conn *sql.DB, query string, limit int) ([]SearchResultHymn, error) {
@@ -625,6 +774,139 @@ func bool_int(value bool) int {
 	}
 
 	return 0
+}
+
+func column_exists(conn *sql.DB, table string, column string) (bool, error) {
+	rows, err := conn.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		cid := 0
+		name := ""
+		columnType := ""
+		notNull := 0
+		defaultValue := sql.NullString{}
+		primaryKey := 0
+
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			return false, err
+		}
+
+		if name == column {
+			return true, nil
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return false, err
+	}
+
+	return false, nil
+}
+
+func event_search_category(category string) string {
+	switch category {
+	case "feasts":
+		return "feast"
+	case "fasts":
+		return "fasting_season"
+	case "remembrances":
+		return "remembrance"
+	}
+
+	return ""
+}
+
+func fast_events(events []CalendarDayEvent) []CalendarDayEvent {
+	filtered := []CalendarDayEvent{}
+	for _, event := range events {
+		if event.Category == "fasting_season" {
+			filtered = append(filtered, event)
+		}
+	}
+
+	return filtered
+}
+
+func fast_free_events(events []CalendarDayEvent) []CalendarDayEvent {
+	filtered := []CalendarDayEvent{}
+	for _, event := range events {
+		if event.Category == "fast_free_week" {
+			filtered = append(filtered, event)
+		}
+	}
+
+	return filtered
+}
+
+func feast_events(events []CalendarDayEvent) []CalendarDayEvent {
+	filtered := []CalendarDayEvent{}
+	for _, event := range events {
+		if event.Category == "fixed_feast" || event.Category == "movable_feast" {
+			filtered = append(filtered, event)
+		}
+	}
+
+	return filtered
+}
+
+func metadata_value(metadata []Metadata, key string) string {
+	for _, item := range metadata {
+		if item.Key == key {
+			return item.Value
+		}
+	}
+
+	return ""
+}
+
+func remembrance_events(events []CalendarDayEvent) []CalendarDayEvent {
+	filtered := []CalendarDayEvent{}
+	for _, event := range events {
+		if event.Category == "remembrance" {
+			filtered = append(filtered, event)
+		}
+	}
+
+	return filtered
+}
+
+func scan_day_v4(conn *sql.DB, day *CalendarDay) error {
+	isHoliday := 0
+	isLentDay := 0
+	if err := conn.QueryRow(`
+		SELECT
+			feasts,
+			fasts,
+			remembrances,
+			fast_free_periods,
+			fasting_level_code,
+			fasting_level_name,
+			fasting_level_description,
+			is_holiday,
+			is_lent_day
+		FROM calendar_days
+		WHERE id = ?
+	`, day.ID).Scan(
+		&day.Feasts,
+		&day.Fasts,
+		&day.Remembrances,
+		&day.FastFreePeriods,
+		&day.FastingLevelCode,
+		&day.FastingLevelName,
+		&day.FastingLevelDescription,
+		&isHoliday,
+		&isLentDay,
+	); err != nil {
+		return err
+	}
+
+	day.IsHoliday = isHoliday == 1
+	day.IsLentDay = isLentDay == 1
+	return nil
 }
 
 func saint_day_sort_key(saint Saint) (int, int) {

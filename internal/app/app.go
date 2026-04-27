@@ -30,7 +30,7 @@ Commands:
                      Show scripture readings for a Gregorian date
   hymns YYYY-MM-DD   Show hymns for a Gregorian date
   search CATEGORY QUERY
-                     Search saints, western, primary, readings, or hymns
+                     Search saints, western, primary, readings, hymns, or events
   serve              Start the local read-only web server
   export-web OUTPUT_DIR
                      Export a static read-only website
@@ -381,47 +381,8 @@ func run_info(opts options, args []string, stdout io.Writer, stderr io.Writer) i
 	}
 	defer conn.Close()
 
-	view := db.InfoView{
-		DatabasePath: dbPath,
-		Metadata:     []db.Metadata{},
-	}
-
-	metadata, err := db.MetadataRows(conn)
+	view, err := db.InfoViewByPath(conn, dbPath)
 	if err != nil {
-		if errors.Is(err, db.ErrTableMissing) {
-			view.MetadataUnavailable = true
-		} else {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-	} else {
-		view.Metadata = metadata
-	}
-
-	if count, err := db.CountRows(conn, "calendar_days"); err == nil {
-		view.Counts.CalendarDays = count
-	} else {
-		fmt.Fprintln(stderr, err)
-		return 1
-	}
-
-	if count, err := db.CountRows(conn, "saints"); err == nil {
-		view.Counts.Saints = count
-	} else {
-		fmt.Fprintln(stderr, err)
-		return 1
-	}
-
-	if count, err := db.CountRows(conn, "scripture_readings"); err == nil {
-		view.Counts.ScriptureReadings = count
-	} else {
-		fmt.Fprintln(stderr, err)
-		return 1
-	}
-
-	if count, err := db.CountRows(conn, "hymns"); err == nil {
-		view.Counts.Hymns = count
-	} else {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
@@ -452,9 +413,14 @@ func print_info(stdout io.Writer, view db.InfoView) {
 	}
 
 	fmt.Fprintf(stdout, "calendar_days: %d\n", view.Counts.CalendarDays)
+	fmt.Fprintf(stdout, "calendar_events: %d\n", view.Counts.CalendarEvents)
+	fmt.Fprintf(stdout, "calendar_day_events: %d\n", view.Counts.CalendarDayEvents)
 	fmt.Fprintf(stdout, "saints: %d\n", view.Counts.Saints)
 	fmt.Fprintf(stdout, "scripture_readings: %d\n", view.Counts.ScriptureReadings)
 	fmt.Fprintf(stdout, "hymns: %d\n", view.Counts.Hymns)
+	if view.SchemaNote != "" {
+		fmt.Fprintf(stdout, "note: %s\n", view.SchemaNote)
+	}
 }
 
 func run_search(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
@@ -498,10 +464,40 @@ func run_search(opts options, args []string, stdout io.Writer, stderr io.Writer)
 
 	case "hymns":
 		return run_search_hymns(conn, opts, query, stdout, stderr)
+
+	case "events", "feasts", "fasts", "remembrances":
+		return run_search_events(conn, opts, query, category, stdout, stderr)
 	}
 
 	fmt.Fprintf(stderr, "error: unknown search category %q\n", category)
 	return 2
+}
+
+func run_search_events(conn *sql.DB, opts options, query string, category string, stdout io.Writer, stderr io.Writer) int {
+	results, err := db.SearchEvents(conn, query, category, opts.limit)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	view := db.SearchEventsView{
+		Query:    query,
+		Category: category,
+		Limit:    db.ClampLimit(opts.limit),
+		Results:  results,
+	}
+
+	if opts.json {
+		if err := render.RenderSearchEventsJSON(view); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+
+		return 0
+	}
+
+	render.SearchEvents(stdout, view)
+	return 0
 }
 
 func run_search_hymns(conn *sql.DB, opts options, query string, stdout io.Writer, stderr io.Writer) int {

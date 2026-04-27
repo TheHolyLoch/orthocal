@@ -25,6 +25,19 @@ func Day(output io.Writer, view db.DayView) {
 		fmt.Fprintf(output, "%s\n", view.Day.FastingRule)
 	}
 
+	if strings.TrimSpace(view.Day.FastingLevelName) != "" {
+		fmt.Fprintf(output, "Calculated: %s", view.Day.FastingLevelName)
+		if strings.TrimSpace(view.Day.FastingLevelCode) != "" {
+			fmt.Fprintf(output, " (%s)", view.Day.FastingLevelCode)
+		}
+		fmt.Fprintln(output)
+	}
+
+	render_event_section(output, "Feasts:", event_titles(view.FeastEvents, view.Day.Feasts))
+	render_event_section(output, "Fasting season:", event_titles(view.FastEvents, view.Day.Fasts))
+	render_event_section(output, "Fast-free period:", event_titles(view.FastFreeEvents, view.Day.FastFreePeriods))
+	render_event_section(output, "Remembrance:", event_titles(view.RemembranceEvents, view.Day.Remembrances))
+
 	saints := view.Saints
 	if len(saints) > 0 {
 		fmt.Fprintln(output)
@@ -126,6 +139,12 @@ func RenderSearchHymnsJSON(view db.SearchHymnsView) error {
 	return encoder.Encode(view)
 }
 
+func RenderSearchEventsJSON(view db.SearchEventsView) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "\t")
+	return encoder.Encode(view)
+}
+
 func RenderSearchReadingsJSON(view db.SearchReadingsView) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "\t")
@@ -169,6 +188,21 @@ func SearchHymns(output io.Writer, view db.SearchHymnsView) {
 	}
 }
 
+func SearchEvents(output io.Writer, view db.SearchEventsView) {
+	if len(view.Results) == 0 {
+		fmt.Fprintln(output, "No event results found.")
+		return
+	}
+
+	for _, result := range view.Results {
+		rangeMarker := ""
+		if result.IsRange {
+			rangeMarker = " - " + result.EndDate
+		}
+		fmt.Fprintf(output, "%s%s  %s  %s\n", result.StartDate, rangeMarker, result.Category, result.Title)
+	}
+}
+
 func SearchReadings(output io.Writer, view db.SearchReadingsView) {
 	if len(view.Results) == 0 {
 		fmt.Fprintln(output, "No scripture reading results found.")
@@ -191,8 +225,30 @@ func SearchSaints(output io.Writer, view db.SearchSaintsView) {
 	}
 
 	for _, result := range view.Results {
-		fmt.Fprintf(output, "%s / %s  %s %s%s\n", result.GregorianDate, result.JulianDate, search_saint_rank(result), result.Name, search_saint_markers(result))
+		fmt.Fprintf(output, "%s / %s  %s%s\n", result.GregorianDate, result.JulianDate, result.Name, search_saint_markers(result))
 	}
+}
+
+func event_titles(events []db.CalendarDayEvent, fallback string) []string {
+	titles := []string{}
+	seen := map[string]bool{}
+
+	for _, event := range events {
+		title := strings.TrimSpace(event.Title)
+		if title != "" && !seen[title] {
+			titles = append(titles, title)
+			seen[title] = true
+		}
+	}
+
+	for _, title := range split_pipe(fallback) {
+		if !seen[title] {
+			titles = append(titles, title)
+			seen[title] = true
+		}
+	}
+
+	return titles
 }
 
 func format_gregorian_date(day db.CalendarDay) string {
@@ -267,15 +323,6 @@ func search_saint_markers(result db.SearchResultSaint) string {
 	return " " + strings.Join(parts, " ")
 }
 
-func search_saint_rank(result db.SearchResultSaint) string {
-	if strings.TrimSpace(result.ServiceRankName) == "" {
-		// return fmt.Sprintf("[%s]", result.ServiceRankCode)
-		return ""
-	}
-	return ""
-	// return fmt.Sprintf("[%s: %s]", result.ServiceRankCode, result.ServiceRankName)
-}
-
 func primary_saints(saints []db.Saint) []db.Saint {
 	filtered := []db.Saint{}
 	for _, saint := range saints {
@@ -290,10 +337,6 @@ func primary_saints(saints []db.Saint) []db.Saint {
 func saint_prefix(saint db.Saint) string {
 	parts := []string{}
 
-	//	if strings.TrimSpace(saint.ServiceRankCode) != "" || strings.TrimSpace(saint.ServiceRankName) != "" {
-	//		parts = append(parts, fmt.Sprintf("[%s: %s]", saint.ServiceRankCode, saint.ServiceRankName))
-	//	}
-
 	if saint.IsPrimary {
 		parts = append(parts, "[primary]")
 	}
@@ -307,6 +350,30 @@ func saint_prefix(saint db.Saint) string {
 	}
 
 	return strings.Join(parts, " ") + " "
+}
+
+func render_event_section(output io.Writer, title string, items []string) {
+	if len(items) == 0 {
+		return
+	}
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, title)
+	for _, item := range items {
+		fmt.Fprintf(output, "\t- %s\n", item)
+	}
+}
+
+func split_pipe(value string) []string {
+	parts := []string{}
+	for _, item := range strings.Split(value, "|") {
+		item = strings.TrimSpace(item)
+		if item != "" {
+			parts = append(parts, item)
+		}
+	}
+
+	return parts
 }
 
 func western_saints(saints []db.Saint) []db.Saint {

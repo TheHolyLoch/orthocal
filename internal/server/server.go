@@ -384,14 +384,19 @@ func (server *Server) render_day_bytes(value string, root string) ([]byte, error
 	}
 
 	return server.render_template_bytes(PageData{
-		Active:    "day",
-		DateValue: value,
-		DayView:   view,
-		HymnCount: len(hymns),
-		NextDate:  shift_date(value, 1),
-		PrevDate:  shift_date(value, -1),
-		Title:     "Calendar",
-		Today:     today(),
+		Active:       "day",
+		DateValue:    value,
+		DayView:      view,
+		FastFree:     day_event_titles(view.FastFreeEvents, view.Day.FastFreePeriods),
+		Fasts:        day_event_titles(view.FastEvents, view.Day.Fasts),
+		Feasts:       day_event_titles(view.FeastEvents, view.Day.Feasts),
+		FastingLevel: fasting_level(view.Day),
+		HymnCount:    len(hymns),
+		NextDate:     shift_date(value, 1),
+		PrevDate:     shift_date(value, -1),
+		Remembrances: day_event_titles(view.RemembranceEvents, view.Day.Remembrances),
+		Title:        "Calendar",
+		Today:        today(),
 	}, root)
 }
 
@@ -471,6 +476,52 @@ func route_date(request *http.Request, prefix string) (string, int, string, bool
 }
 
 var errDateNotFound = errors.New("date not found")
+
+func day_event_titles(events []db.CalendarDayEvent, fallback string) []string {
+	titles := []string{}
+	seen := map[string]bool{}
+
+	for _, event := range events {
+		title := strings.TrimSpace(event.Title)
+		if title != "" && !seen[title] {
+			titles = append(titles, title)
+			seen[title] = true
+		}
+	}
+
+	for _, title := range split_pipe(fallback) {
+		if !seen[title] {
+			titles = append(titles, title)
+			seen[title] = true
+		}
+	}
+
+	return titles
+}
+
+func fasting_level(day db.CalendarDay) string {
+	if strings.TrimSpace(day.FastingLevelName) == "" {
+		return ""
+	}
+
+	if strings.TrimSpace(day.FastingLevelCode) == "" {
+		return day.FastingLevelName
+	}
+
+	return fmt.Sprintf("%s (%s)", day.FastingLevelName, day.FastingLevelCode)
+}
+
+func split_pipe(value string) []string {
+	parts := []string{}
+	for _, item := range strings.Split(value, "|") {
+		item = strings.TrimSpace(item)
+		if item != "" {
+			parts = append(parts, item)
+		}
+	}
+
+	return parts
+}
 
 func write_file(path string, content []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {

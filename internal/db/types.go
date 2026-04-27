@@ -4,21 +4,58 @@
 package db
 
 type CalendarDay struct {
-	ID               int    `json:"id"`
-	DataHeader       string `json:"dataheader"`
-	GregorianDate    string `json:"gregorian_date"`
-	GregorianWeekday string `json:"gregorian_weekday"`
-	JulianDate       string `json:"julian_date"`
-	HeaderHeader     string `json:"headerheader"`
-	FastingRule      string `json:"fasting_rule"`
+	ID                      int    `json:"id"`
+	DataHeader              string `json:"dataheader"`
+	GregorianDate           string `json:"gregorian_date"`
+	GregorianWeekday        string `json:"gregorian_weekday"`
+	JulianDate              string `json:"julian_date"`
+	HeaderHeader            string `json:"headerheader"`
+	FastingRule             string `json:"fasting_rule"`
+	Feasts                  string `json:"feasts"`
+	Fasts                   string `json:"fasts"`
+	Remembrances            string `json:"remembrances"`
+	FastFreePeriods         string `json:"fast_free_periods"`
+	FastingLevelCode        string `json:"fasting_level_code"`
+	FastingLevelName        string `json:"fasting_level_name"`
+	FastingLevelDescription string `json:"fasting_level_description"`
+	IsHoliday               bool   `json:"is_holiday"`
+	IsLentDay               bool   `json:"is_lent_day"`
 }
 
 type DayView struct {
 	Day               CalendarDay        `json:"day"`
+	Events            []CalendarDayEvent `json:"events"`
+	FeastEvents       []CalendarDayEvent `json:"feast_events"`
+	FastEvents        []CalendarDayEvent `json:"fast_events"`
+	RemembranceEvents []CalendarDayEvent `json:"remembrance_events"`
+	FastFreeEvents    []CalendarDayEvent `json:"fast_free_events"`
 	PrimarySaints     []Saint            `json:"primary_saints"`
 	WesternSaints     []Saint            `json:"western_saints"`
 	ScriptureReadings []ScriptureReading `json:"scripture_readings"`
 	Saints            []Saint            `json:"saints"`
+}
+
+type CalendarDayEvent struct {
+	DayID     int    `json:"day_id"`
+	EventID   int    `json:"event_id"`
+	EventDate string `json:"event_date"`
+	Category  string `json:"category"`
+	Title     string `json:"title"`
+	SortOrder int    `json:"sort_order"`
+}
+
+type CalendarEvent struct {
+	ID            int    `json:"id"`
+	EventKey      string `json:"event_key"`
+	Category      string `json:"category"`
+	Title         string `json:"title"`
+	StartDate     string `json:"start_date"`
+	EndDate       string `json:"end_date"`
+	IsRange       bool   `json:"is_range"`
+	SourceScript  string `json:"source_script"`
+	SourceRootURL string `json:"source_root_url"`
+	Notes         string `json:"notes"`
+	SortOrder     int    `json:"sort_order"`
 }
 
 type Hymn struct {
@@ -37,6 +74,8 @@ type HymnsView struct {
 
 type InfoCounts struct {
 	CalendarDays      int `json:"calendar_days"`
+	CalendarEvents    int `json:"calendar_events"`
+	CalendarDayEvents int `json:"calendar_day_events"`
 	Saints            int `json:"saints"`
 	ScriptureReadings int `json:"scripture_readings"`
 	Hymns             int `json:"hymns"`
@@ -46,6 +85,7 @@ type InfoView struct {
 	DatabasePath        string     `json:"database_path"`
 	Metadata            []Metadata `json:"metadata"`
 	Counts              InfoCounts `json:"counts"`
+	SchemaNote          string     `json:"schema_note,omitempty"`
 	MetadataUnavailable bool       `json:"-"`
 }
 
@@ -89,11 +129,26 @@ type SearchHymnsView struct {
 	Results  []SearchResultHymn `json:"results"`
 }
 
+type SearchEventsView struct {
+	Query    string              `json:"query"`
+	Category string              `json:"category"`
+	Limit    int                 `json:"limit"`
+	Results  []SearchResultEvent `json:"results"`
+}
+
 type SearchReadingsView struct {
 	Query    string                `json:"query"`
 	Category string                `json:"category"`
 	Limit    int                   `json:"limit"`
 	Results  []SearchResultReading `json:"results"`
+}
+
+type SearchResultEvent struct {
+	Category  string `json:"category"`
+	Title     string `json:"title"`
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
+	IsRange   bool   `json:"is_range"`
 }
 
 type SearchResultHymn struct {

@@ -42,6 +42,7 @@ const templates = `
 	<h1>{{.DayView.Day.DataHeader}}</h1>
 	{{if .DayView.Day.HeaderHeader}}<p class="subhead">{{.DayView.Day.HeaderHeader}}</p>{{end}}
 	{{if .DayView.Day.FastingRule}}<p class="fasting">{{.DayView.Day.FastingRule}}</p>{{end}}
+	{{if .FastingLevel}}<p class="fasting">Calculated: {{.FastingLevel}}</p>{{end}}
 	<div class="controls">
 		<a class="button" href="{{.DayPrefix}}{{.PrevDate}}{{.LinkSuffix}}">Previous Day</a>
 		<a class="button" href="{{.DayPrefix}}{{.NextDate}}{{.LinkSuffix}}">Next Day</a>
@@ -53,13 +54,57 @@ const templates = `
 </section>
 
 <section class="grid">
+	{{if .Feasts}}
+	<article class="panel">
+		<h2>Feasts</h2>
+		<ul>
+		{{range .Feasts}}
+			<li>{{.}}</li>
+		{{end}}
+		</ul>
+	</article>
+	{{end}}
+
+	{{if .Fasts}}
+	<article class="panel">
+		<h2>Fasting Season</h2>
+		<ul>
+		{{range .Fasts}}
+			<li>{{.}}</li>
+		{{end}}
+		</ul>
+	</article>
+	{{end}}
+
+	{{if .FastFree}}
+	<article class="panel">
+		<h2>Fast-free Period</h2>
+		<ul>
+		{{range .FastFree}}
+			<li>{{.}}</li>
+		{{end}}
+		</ul>
+	</article>
+	{{end}}
+
+	{{if .Remembrances}}
+	<article class="panel">
+		<h2>Remembrance</h2>
+		<ul>
+		{{range .Remembrances}}
+			<li>{{.}}</li>
+		{{end}}
+		</ul>
+	</article>
+	{{end}}
+
 	{{if .DayView.Saints}}
 	<article class="panel">
 		<h2>Saints</h2>
 		<ol>
 		{{range .DayView.Saints}}
 			<li>
-				{{if .ServiceRankCode}}[{{.ServiceRankCode}}] {{end}}{{.Name}}
+				{{.Name}}
 				{{if .IsPrimary}}<span class="tag">primary</span>{{end}}
 				{{if .IsWestern}}<span class="tag">western</span><span class="tag">Britain and Ireland</span>{{end}}
 			</li>
@@ -102,7 +147,7 @@ const templates = `
 	<ol>
 	{{range .SaintsView.Saints}}
 		<li>
-			{{if .ServiceRankCode}}[{{.ServiceRankCode}}] {{end}}{{.Name}}
+			{{.Name}}
 			{{if .IsPrimary}}<span class="tag">primary</span>{{end}}
 			{{if .IsWestern}}<span class="tag">western</span>{{end}}
 		</li>

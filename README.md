@@ -4,6 +4,8 @@ Orthocal is a native POSIX command line program for reading Orthodox Old Style c
 
 This pass supports database path resolution, SQLite opening, `info`, `today`, `tomorrow`, and `date`.
 
+Schema version 4 databases include calculated calendar events, fasting seasons, fast-free periods, remembrances, and calculated fasting levels.
+
 ## Table of Contents
 - [Requirements](#requirements)
 - [Setup](#setup)
@@ -62,6 +64,10 @@ orthocal search western Osburga --db ./orthodox-calendar.db
 orthocal search primary Climacus --db ./orthodox-calendar.db
 orthocal search readings "John 20" --db ./orthodox-calendar.db
 orthocal search hymns resurrection --db ./orthodox-calendar.db
+orthocal search events Pascha --db ./orthodox-calendar.db
+orthocal search feasts Pascha --db ./orthodox-calendar.db
+orthocal search fasts Lent --db ./orthodox-calendar.db
+orthocal search remembrances departed --db ./orthodox-calendar.db
 orthocal search saints John --limit 50 --db ./orthodox-calendar.db
 ```
 
@@ -131,6 +137,10 @@ orthocal search western Osburga
 orthocal search primary Climacus
 orthocal search readings "John 20"
 orthocal search hymns resurrection
+orthocal search events Pascha
+orthocal search feasts Pascha
+orthocal search fasts Lent
+orthocal search remembrances departed
 orthocal search saints John --limit 50
 orthocal serve --db ./orthodox-calendar.db
 orthocal serve --db ./orthodox-calendar.db --addr 127.0.0.1:9090
