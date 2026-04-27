@@ -33,6 +33,7 @@ Commands:
   readings YYYY-MM-DD
                      Show scripture readings for a Gregorian date
   hymns YYYY-MM-DD   Show hymns for a Gregorian date
+  events YYYY-MM-DD  Show calendar events for a Gregorian date
   search CATEGORY QUERY
                      Search saints, western, primary, readings, hymns, or events
   version            Show version and build information
@@ -99,6 +100,9 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	case "hymns":
 		return run_hymns(opts, commandArgs, stdout, stderr)
+
+	case "events":
+		return run_events(opts, commandArgs, stdout, stderr)
 
 	case "export-web":
 		return run_export_web(opts, commandArgs, stdout, stderr)
@@ -306,6 +310,25 @@ func open_day_view(opts options, value string) (db.DayView, bool, error) {
 	return db.DayViewByGregorianDate(conn, value)
 }
 
+func open_events_view(opts options, value string) (db.EventsView, bool, error) {
+	dbPath, err := config.ResolveDBPath(opts.dbPath)
+	if err != nil {
+		return db.EventsView{}, false, err
+	}
+
+	if err := harden_read_only_cli(dbPath); err != nil {
+		return db.EventsView{}, false, err
+	}
+
+	conn, err := db.Open(dbPath)
+	if err != nil {
+		return db.EventsView{}, false, err
+	}
+	defer conn.Close()
+
+	return db.EventsViewByGregorianDate(conn, value)
+}
+
 func open_hymns_view(opts options, value string) (db.HymnsView, bool, error) {
 	dbPath, err := config.ResolveDBPath(opts.dbPath)
 	if err != nil {
@@ -395,6 +418,36 @@ func run_date(opts options, args []string, stdout io.Writer, stderr io.Writer) i
 	}
 
 	return render_day(opts, value, stdout, stderr)
+}
+
+func run_events(opts options, args []string, stdout io.Writer, stderr io.Writer) int {
+	value, ok := parse_date_argument(args, "events", stderr)
+	if !ok {
+		return 2
+	}
+
+	view, found, err := open_events_view(opts, value)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	if !found {
+		fmt.Fprintf(stderr, "date not found: %s\n", value)
+		return 1
+	}
+
+	if opts.json {
+		if err := render.RenderEventsJSON(view); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+
+		return 0
+	}
+
+	render.Events(stdout, view)
+	return 0
 }
 
 func run_export_web(opts options, args []string, stdout io.Writer, stderr io.Writer) int {

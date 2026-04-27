@@ -1,18 +1,12 @@
 .env
-*.db.bak
-/orthocal
-/dist/
-# Binaries
+bin/
 orthocal
 orthocal.exe
-bin/
 
-# Go build/test output
 *.test
 *.out
 coverage.out
 
-# Local databases
 *.db
 *.db-shm
 *.db-wal
@@ -20,16 +14,7 @@ coverage.out
 *.sqlite3
 *.bak
 
-# Local config/env
-.env
-
-# Logs/temp
 logs/
 tmp/
 *.log
-
-# Editor/OS files
-.DS_Store
-.vscode/
-.idea/
-AGENTS.md
+*.tmp

@@ -84,6 +84,27 @@ func Hymns(output io.Writer, view db.HymnsView) {
 	}
 }
 
+func Events(output io.Writer, view db.EventsView) {
+	fmt.Fprintf(output, "%s / %s\n", format_gregorian_date(view.Day), format_julian_date(view.Day.JulianDate))
+	fmt.Fprintln(output)
+
+	if len(view.Events) == 0 {
+		fmt.Fprintln(output, "No calendar events found.")
+		return
+	}
+
+	fmt.Fprintln(output, "Events:")
+	for _, event := range view.Events {
+		fmt.Fprintf(output, "\t- %s: %s\n", event.Category, event.Title)
+	}
+}
+
+func RenderEventsJSON(view db.EventsView) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "\t")
+	return encoder.Encode(view)
+}
+
 func Readings(output io.Writer, view db.ReadingsView) {
 	fmt.Fprintf(output, "%s / %s\n", format_gregorian_date(view.Day), format_julian_date(view.Day.JulianDate))
 	fmt.Fprintln(output)

@@ -12,9 +12,12 @@ Schema version 4 databases include calculated calendar events, fasting seasons, 
 - [Database Path](#database-path)
 - [Update Behavior](#update-behavior)
 - [Schema Compatibility](#schema-compatibility)
+- [Database Schema](#database-schema)
 - [Shell Completions](#shell-completions)
 - [Manual Page](#manual-page)
 - [OpenBSD Notes](#openbsd-notes)
+- [Release Checklist](#release-checklist)
+- [License](#license)
 - [Examples](#examples)
 
 ## Requirements
@@ -66,6 +69,7 @@ orthocal [--db PATH] [--plain] [--json] COMMAND [ARGS]
 | `saints YYYY-MM-DD`     | Show saints for a Gregorian date     |
 | `readings YYYY-MM-DD`   | Show readings for a Gregorian date   |
 | `hymns YYYY-MM-DD`      | Show hymns for a Gregorian date      |
+| `events YYYY-MM-DD`     | Show calendar events for a date      |
 | `search CATEGORY QUERY` | Search calendar data                 |
 | `serve`                 | Start the local read-only web server |
 | `export-web OUTPUT_DIR` | Export a static read-only website    |
@@ -88,6 +92,7 @@ orthocal date 2026-04-12 --db ./orthodox-calendar.db
 orthocal saints 2026-04-12 --db ./orthodox-calendar.db
 orthocal readings 2026-04-12 --db ./orthodox-calendar.db
 orthocal hymns 2026-04-12 --db ./orthodox-calendar.db
+orthocal events 2026-04-12 --db ./orthodox-calendar.db
 ```
 
 Search calendar data:
@@ -110,6 +115,7 @@ orthocal date 2026-04-12 --db ./orthodox-calendar.db --json
 orthocal saints 2026-04-12 --db ./orthodox-calendar.db --json
 orthocal readings 2026-04-12 --db ./orthodox-calendar.db --json
 orthocal hymns 2026-04-12 --db ./orthodox-calendar.db --json
+orthocal events 2026-04-12 --db ./orthodox-calendar.db --json
 orthocal search saints John --db ./orthodox-calendar.db --json
 orthocal info --db ./orthodox-calendar.db --json
 ```
@@ -167,6 +173,9 @@ Orthocal supports schema version 4. Older databases still run with degraded even
 
 `orthocal info` prints the detected schema version and compatibility message. Newer databases show a warning, but read-only commands continue if the required columns are still compatible.
 
+## Database Schema
+See [docs/DB_SCHEMA.md](docs/DB_SCHEMA.md) for expected tables, key columns, schema version 4 event support, and backward compatibility notes.
+
 ## Shell Completions
 Static completions are included for bash, zsh, and fish.
 
@@ -188,6 +197,9 @@ Then read it with:
 man orthocal
 ```
 
+## Release Checklist
+See [docs/RELEASE.md](docs/RELEASE.md) for the release checklist.
+
 ## OpenBSD Notes
 Orthocal includes OpenBSD `pledge(2)` and `unveil(2)` support. On non-OpenBSD systems these calls are no-ops.
 
@@ -207,6 +219,9 @@ rcctl set orthocal flags "serve --db /var/db/orthocal/orthodox-calendar.db --add
 rcctl start orthocal
 ```
 
+## License
+Orthocal is released under the ISC License. See [LICENSE](LICENSE).
+
 ## Examples
 ```sh
 orthocal today
@@ -215,6 +230,7 @@ orthocal date 2026-04-12
 orthocal saints 2026-04-12
 orthocal readings 2026-04-12
 orthocal hymns 2026-04-12
+orthocal events 2026-04-12
 orthocal search saints John
 orthocal search western Osburga
 orthocal search primary Climacus

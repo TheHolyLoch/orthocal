@@ -207,6 +207,23 @@ func DayViewByGregorianDate(conn *sql.DB, value string) (DayView, bool, error) {
 	}, true, nil
 }
 
+func EventsViewByGregorianDate(conn *sql.DB, value string) (EventsView, bool, error) {
+	day, found, err := DayByGregorianDate(conn, value)
+	if err != nil || !found {
+		return EventsView{}, found, err
+	}
+
+	events, err := CalendarDayEventsByDayID(conn, day.ID)
+	if err != nil {
+		return EventsView{}, false, err
+	}
+
+	return EventsView{
+		Day:    day,
+		Events: events,
+	}, true, nil
+}
+
 func CalendarDayEventsByDayID(conn *sql.DB, dayID int) ([]CalendarDayEvent, error) {
 	exists, err := table_exists(conn, "calendar_day_events")
 	if err != nil {

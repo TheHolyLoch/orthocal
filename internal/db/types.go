@@ -72,6 +72,11 @@ type HymnsView struct {
 	Hymns []Hymn      `json:"hymns"`
 }
 
+type EventsView struct {
+	Day    CalendarDay        `json:"day"`
+	Events []CalendarDayEvent `json:"events"`
+}
+
 type InfoCounts struct {
 	CalendarDays      int `json:"calendar_days"`
 	CalendarEvents    int `json:"calendar_events"`
